@@ -159,7 +159,7 @@ CFPropertyListSerializers[CFPropertyList.FormatXML_v1_0] =
 
     "string":       function(/*String*/ aString)
                     {
-                        return "<string>" + encodeHTMLComponent(aString) + "</string>";;
+                        return "<string>" + encodeHTMLComponent(aString) + "</string>";
                     },
 
     "boolean" :     function(/*Boolean*/ aBoolean)
@@ -603,7 +603,8 @@ CFPropertyList.propertyListFromXML = function(/*String | XMLNode*/ aStringOrXMLN
                                         break;
 
             case PLIST_DATA:            object = new CFMutableData();
-                                        object.bytes = FIRST_CHILD(XMLNode) ? CFData.decodeBase64ToArray(TEXT_CONTENT(XMLNode), YES) : [];
+                                        var data_bytes = FIRST_CHILD(XMLNode) ? CFData.decodeBase64ToArray(TEXT_CONTENT(XMLNode), YES) : [];
+                                        object.setBytes(data_bytes);
                                         break;
 
             default:                    throw new Error("*** " + NODE_NAME(XMLNode) + " tag not recognized in Plist.");

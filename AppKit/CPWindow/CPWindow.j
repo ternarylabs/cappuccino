@@ -455,6 +455,7 @@ CPTexturedBackgroundWindowMask
         if (aStyleMask & CPBorderlessBridgeWindowMask)
             [self setFullPlatformWindow:YES];
 
+        _autorecalculatesKeyViewLoop = NO;
         _defaultButtonEnabled = YES;
         _keyViewLoopIsDirty = YES;
 
@@ -515,6 +516,10 @@ CPTexturedBackgroundWindowMask
 - (void)awakeFromCib
 {
     _keyViewLoopIsDirty = ![self _hasKeyViewLoop];
+    // If no key view loop has been specified by hand, and we are not intending to auto recalculate,
+    // set up a default key view loop.
+    if (_keyViewLoopIsDirty && ![self autorecalculatesKeyViewLoop])
+        [self recalculateKeyViewLoop];
 }
 
 - (void)_setWindowView:(CPView)aWindowView
