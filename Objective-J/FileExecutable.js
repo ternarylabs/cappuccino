@@ -42,7 +42,7 @@ function FileExecutable(/*CFURL|String*/ aURL)
         executable = decompile(fileContents, aURL);
 
     else if (extension === "j" || !extension)
-        executable = exports.preprocess(fileContents, aURL, Preprocessor.Flags.IncludeDebugSymbols);
+        executable = exports.preprocess(fileContents, aURL, Preprocessor.Flags.IncludeDebugSymbols | Preprocessor.Flags.IncludeTypeSignatures);
 
     else
         executable = new Executable(fileContents, [], aURL);
