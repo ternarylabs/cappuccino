@@ -292,6 +292,9 @@ var CPViewFlags                     = { },
         CPDOMDisplayServerSetStyleLeftTop(_DOMElement, NULL, _CGRectGetMinX(aFrame), _CGRectGetMinY(aFrame));
         CPDOMDisplayServerSetStyleSize(_DOMElement, width, height);
 
+        if (typeof(appkit_tag_dom_elements) !== "undefined" && !!appkit_tag_dom_elements)
+            _DOMElement.setAttribute("data-cappuccino-view", [self className]);
+
         _DOMImageParts = [];
         _DOMImageSizes = [];
 #endif
@@ -366,6 +369,9 @@ var CPViewFlags                     = { },
 /* @ignore */
 - (void)_insertSubview:(CPView)aSubview atIndex:(int)anIndex
 {
+    if (aSubview === self)
+        [CPException raise:CPInvalidArgumentException reason:"can't add a view as a subview of itself"];
+
     // We will have to adjust the z-index of all views starting at this index.
     var count = _subviews.length;
 
@@ -528,7 +534,7 @@ var CPViewFlags                     = { },
     var addedSubview = nil,
         addedSubviewEnumerator = [addedSubviews objectEnumerator];
 
-    while (addedSubview = [addedSubviewEnumerator nextObject])
+    while ((addedSubview = [addedSubviewEnumerator nextObject]) !== nil)
         [self addSubview:addedSubview];
 
     // If the order is fine, no need to reorder.
@@ -2591,6 +2597,50 @@ setBoundsOrigin:
 - (BOOL)hasThemeAttribute:(CPString)aName
 {
     return (_themeAttributes && _themeAttributes[aName] !== undefined);
+}
+
+/*!
+    Registers theme values encoded in an array at runtime. The format of the data in the array
+    is the same as that used by ThemeDescriptors.j, with the exception that you need to use
+    CPColorWithImages() in place of PatternColor(). For more information see the comments
+    at the top of ThemeDescriptors.j.
+
+    @param themeValues array of theme values
+*/
+- (void)registerThemeValues:(CPArray)themeValues
+{
+    for (var i = 0; i < themeValues.length; ++i)
+    {
+        var attributeValueState = themeValues[i],
+            attribute = attributeValueState[0],
+            value = attributeValueState[1],
+            state = attributeValueState[2];
+
+        if (state)
+            [self setValue:value forThemeAttribute:attribute inState:state];
+        else
+            [self setValue:value forThemeAttribute:attribute];
+    }
+}
+
+/*!
+    Registers theme values encoded in an array at runtime. The format of the data in the array
+    is the same as that used by ThemeDescriptors.j, with the exception that you need to use
+    CPColorWithImages() in place of PatternColor(). The values in \c inheritedValues are
+    registered first, then those in \c themeValues override/augment the inherited values.
+    For more information see the comments at the top of ThemeDescriptors.j.
+
+    @param themeValues array of base theme values
+    @param inheritedValues array of overridden/additional theme values
+*/
+- (void)registerThemeValues:(CPArray)themeValues inherit:(CPArray)inheritedValues
+{
+    // Register inherited values first, then override those with the subtheme values.
+    if (inheritedValues)
+        [self registerThemeValues:inheritedValues];
+
+    if (themeValues)
+        [self registerThemeValues:themeValues];
 }
 
 - (CPView)createEphemeralSubviewNamed:(CPString)aViewName
