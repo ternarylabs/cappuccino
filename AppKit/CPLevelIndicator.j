@@ -21,6 +21,9 @@
  */
 
 @import "CPControl.j"
+@import "CPWindow_Constants.j"
+
+@global CPApp
 
 CPTickMarkBelow                             = 0;
 CPTickMarkAbove                             = 1;
@@ -31,14 +34,6 @@ CPRelevancyLevelIndicatorStyle              = 0;
 CPContinuousCapacityLevelIndicatorStyle     = 1;
 CPDiscreteCapacityLevelIndicatorStyle       = 2;
 CPRatingLevelIndicatorStyle                 = 3;
-
-var _CPLevelIndicatorBezelColor = nil,
-    _CPLevelIndicatorSegmentEmptyColor = nil,
-    _CPLevelIndicatorSegmentNormalColor = nil,
-    _CPLevelIndicatorSegmentWarningColor = nil,
-    _CPLevelIndicatorSegmentCriticalColor = nil,
-
-    _CPLevelIndicatorSpacing = 1;
 
 /*!
     @ingroup appkit
@@ -62,54 +57,21 @@ var _CPLevelIndicatorBezelColor = nil,
     BOOL                _isTracking;
 }
 
-+ (void)initialize
++ (CPString)defaultThemeClass
 {
-    var bundle = [CPBundle bundleForClass:CPLevelIndicator];
+    return "level-indicator";
+}
 
-    _CPLevelIndicatorBezelColor = [CPColor colorWithPatternImage:[[CPThreePartImage alloc] initWithImageSlices:
-        [
-            [[CPImage alloc] initWithContentsOfFile:[bundle pathForResource:@"CPLevelIndicator/level-indicator-bezel-left.png"] size:CGSizeMake(3.0, 18.0)],
-            [[CPImage alloc] initWithContentsOfFile:[bundle pathForResource:@"CPLevelIndicator/level-indicator-bezel-center.png"] size:CGSizeMake(1.0, 18.0)],
-            [[CPImage alloc] initWithContentsOfFile:[bundle pathForResource:@"CPLevelIndicator/level-indicator-bezel-right.png"] size:CGSizeMake(3.0, 18.0)]
-        ]
-        isVertical:NO
-    ]];
-
-    _CPLevelIndicatorSegmentEmptyColor = [CPColor colorWithPatternImage:[[CPThreePartImage alloc] initWithImageSlices:
-        [
-            [[CPImage alloc] initWithContentsOfFile:[bundle pathForResource:@"CPLevelIndicator/level-indicator-segment-empty-left.png"] size:CGSizeMake(3.0, 17.0)],
-            [[CPImage alloc] initWithContentsOfFile:[bundle pathForResource:@"CPLevelIndicator/level-indicator-segment-empty-center.png"] size:CGSizeMake(1.0, 17.0)],
-            [[CPImage alloc] initWithContentsOfFile:[bundle pathForResource:@"CPLevelIndicator/level-indicator-segment-empty-right.png"] size:CGSizeMake(3.0, 17.0)]
-        ]
-        isVertical:NO
-    ]];
-
-    _CPLevelIndicatorSegmentNormalColor = [CPColor colorWithPatternImage:[[CPThreePartImage alloc] initWithImageSlices:
-        [
-            [[CPImage alloc] initWithContentsOfFile:[bundle pathForResource:@"CPLevelIndicator/level-indicator-segment-normal-left.png"] size:CGSizeMake(3.0, 17.0)],
-            [[CPImage alloc] initWithContentsOfFile:[bundle pathForResource:@"CPLevelIndicator/level-indicator-segment-normal-center.png"] size:CGSizeMake(1.0, 17.0)],
-            [[CPImage alloc] initWithContentsOfFile:[bundle pathForResource:@"CPLevelIndicator/level-indicator-segment-normal-right.png"] size:CGSizeMake(3.0, 17.0)]
-        ]
-        isVertical:NO
-    ]];
-
-    _CPLevelIndicatorSegmentWarningColor = [CPColor colorWithPatternImage:[[CPThreePartImage alloc] initWithImageSlices:
-        [
-            [[CPImage alloc] initWithContentsOfFile:[bundle pathForResource:@"CPLevelIndicator/level-indicator-segment-warning-left.png"] size:CGSizeMake(3.0, 17.0)],
-            [[CPImage alloc] initWithContentsOfFile:[bundle pathForResource:@"CPLevelIndicator/level-indicator-segment-warning-center.png"] size:CGSizeMake(1.0, 17.0)],
-            [[CPImage alloc] initWithContentsOfFile:[bundle pathForResource:@"CPLevelIndicator/level-indicator-segment-warning-right.png"] size:CGSizeMake(3.0, 17.0)]
-        ]
-        isVertical:NO
-    ]];
-
-    _CPLevelIndicatorSegmentCriticalColor = [CPColor colorWithPatternImage:[[CPThreePartImage alloc] initWithImageSlices:
-        [
-            [[CPImage alloc] initWithContentsOfFile:[bundle pathForResource:@"CPLevelIndicator/level-indicator-segment-critical-left.png"] size:CGSizeMake(3.0, 17.0)],
-            [[CPImage alloc] initWithContentsOfFile:[bundle pathForResource:@"CPLevelIndicator/level-indicator-segment-critical-center.png"] size:CGSizeMake(1.0, 17.0)],
-            [[CPImage alloc] initWithContentsOfFile:[bundle pathForResource:@"CPLevelIndicator/level-indicator-segment-critical-right.png"] size:CGSizeMake(3.0, 17.0)]
-        ]
-        isVertical:NO
-    ]];
++ (CPDictionary)themeAttributes
+{
+    return @{
+            @"bezel-color": [CPNull null],
+            @"color-empty": [CPNull null],
+            @"color-normal": [CPNull null],
+            @"color-warning": [CPNull null],
+            @"color-critical": [CPNull null],
+            @"spacing": 1.0,
+        };
 }
 
 - (id)initWithFrame:(CGRect)aFrame
@@ -122,15 +84,9 @@ var _CPLevelIndicatorBezelColor = nil,
         _maxValue = 2;
         _warningValue = 2;
         _criticalValue = 2;
-
-        [self _init];
     }
 
     return self;
-}
-
-- (void)_init
-{
 }
 
 - (void)layoutSubviews
@@ -139,20 +95,20 @@ var _CPLevelIndicatorBezelColor = nil,
                                            positioned:CPWindowBelow
                       relativeToEphemeralSubviewNamed:nil];
     // TODO Make themable.
-    [bezelView setBackgroundColor:_CPLevelIndicatorBezelColor];
+    [bezelView setBackgroundColor:[self valueForThemeAttribute:@"bezel-color"]];
 
     var segmentCount = _maxValue - _minValue;
 
     if (segmentCount <= 0)
         return;
 
-    var filledColor = _CPLevelIndicatorSegmentNormalColor,
+    var filledColor = [self valueForThemeAttribute:@"color-normal"],
         value = [self doubleValue];
 
     if (value <= _criticalValue)
-        filledColor = _CPLevelIndicatorSegmentCriticalColor;
+        filledColor = [self valueForThemeAttribute:@"color-critical"];
     else if (value <= _warningValue)
-        filledColor = _CPLevelIndicatorSegmentWarningColor;
+        filledColor = [self valueForThemeAttribute:@"color-warning"];
 
     for (var i = 0; i < segmentCount; i++)
     {
@@ -160,13 +116,13 @@ var _CPLevelIndicatorBezelColor = nil,
                                                positioned:CPWindowAbove
                           relativeToEphemeralSubviewNamed:bezelView];
 
-        [segmentView setBackgroundColor:(_minValue + i) < value ? filledColor : _CPLevelIndicatorSegmentEmptyColor];
+        [segmentView setBackgroundColor:(_minValue + i) < value ? filledColor : [self valueForThemeAttribute:@"color-empty"]];
     }
 }
 
 - (CPView)createEphemeralSubviewNamed:(CPString)aName
 {
-    return [[CPView alloc] initWithFrame:_CGRectMakeZero()];
+    return [[CPView alloc] initWithFrame:CGRectMakeZero()];
 }
 
 - (CGRect)rectForEphemeralSubviewNamed:(CPString)aViewName
@@ -174,11 +130,11 @@ var _CPLevelIndicatorBezelColor = nil,
     // TODO Put into theme attributes.
     var bezelHeight = 18,
         segmentHeight = 17,
-        bounds = _CGRectCreateCopy([self bounds]);
+        bounds = CGRectCreateCopy([self bounds]);
 
     if (aViewName == "bezel")
     {
-        bounds.origin.y = (_CGRectGetHeight(bounds) - bezelHeight) / 2.0;
+        bounds.origin.y = (CGRectGetHeight(bounds) - bezelHeight) / 2.0;
         bounds.size.height = bezelHeight;
         return bounds;
     }
@@ -188,20 +144,21 @@ var _CPLevelIndicatorBezelColor = nil,
             segmentCount = _maxValue - _minValue;
 
         if (segment >= segmentCount)
-            return _CGRectMakeZero();
+            return CGRectMakeZero();
 
         var basicSegmentWidth = bounds.size.width / segmentCount,
-            segmentFrame = CGRectCreateCopy([self bounds]);
+            segmentFrame = CGRectCreateCopy([self bounds]),
+            spacing = [self valueForThemeAttribute:@"spacing"];
 
-        segmentFrame.origin.y = (_CGRectGetHeight(bounds) - bezelHeight) / 2.0;
+        segmentFrame.origin.y = (CGRectGetHeight(bounds) - bezelHeight) / 2.0;
         segmentFrame.origin.x =  FLOOR(segment * basicSegmentWidth);
-        segmentFrame.size.width = (segment == segmentCount - 1) ? bounds.size.width - segmentFrame.origin.x : FLOOR(((segment + 1) * basicSegmentWidth)) - FLOOR((segment * basicSegmentWidth)) - _CPLevelIndicatorSpacing;
+        segmentFrame.size.width = (segment == segmentCount - 1) ? bounds.size.width - segmentFrame.origin.x : FLOOR(((segment + 1) * basicSegmentWidth)) - FLOOR((segment * basicSegmentWidth)) - spacing;
         segmentFrame.size.height = segmentHeight;
 
         return segmentFrame;
     }
 
-    return _CGRectMakeZero();
+    return CGRectMakeZero();
 }
 
 /*!
@@ -223,7 +180,7 @@ var _CPLevelIndicatorBezelColor = nil,
     return _isEditable;
 }
 
-- (CPView)hitTest:(CPPoint)aPoint
+- (CPView)hitTest:(CGPoint)aPoint
 {
     // Don't swallow clicks when displayed in a table.
     if (![self isEditable])
@@ -253,7 +210,7 @@ var _CPLevelIndicatorBezelColor = nil,
 
         var location = [self convertPoint:[anEvent locationInWindow] fromView:nil],
             bounds = [self bounds],
-            oldValue = [self doubleValue];
+            oldValue = [self doubleValue],
             newValue = oldValue;
 
         // Moving the mouse outside of the widget to the left sets it
@@ -384,8 +341,6 @@ var CPLevelIndicatorStyleKey                    = "CPLevelIndicatorStyleKey",
         _numberOfMajorTickMarks = [aCoder decodeIntForKey:CPLevelIndicatorNumberOfMajorTickMarksKey];
 
         _isEditable = [aCoder decodeBoolForKey:CPLevelIndicatorIsEditableKey];
-
-        [self _init];
 
         [self setNeedsLayout];
         [self setNeedsDisplay:YES];

@@ -20,6 +20,8 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
+@import "CPException.j"
+@import "CPNull.j"
 @import "CPObject.j"
 @import "CPObjJRuntime.j"
 
@@ -48,7 +50,7 @@ var CPNumberUIDs    = new CFMutableDictionary();
 
 + (id)numberWithBool:(BOOL)aBoolean
 {
-    return aBoolean;
+    return aBoolean ? 1 : 0;
 }
 
 + (id)numberWithChar:(char)aChar
@@ -222,7 +224,8 @@ FIXME: Do we need this?
 
 - (CPString)descriptionWithLocale:(CPDictionary)aDictionary
 {
-    if (!aDictionary) return toString();
+    if (!aDictionary)
+        return self.toString();
 
     throw new Error("descriptionWithLocale: NOT YET IMPLEMENTED");
 }
@@ -234,43 +237,49 @@ FIXME: Do we need this?
 
 - (double)doubleValue
 {
-    if (typeof self == "boolean") return self ? 1 : 0;
+    if (typeof self == "boolean")
+        return self ? 1 : 0;
     return self;
 }
 
 - (float)floatValue
 {
-    if (typeof self == "boolean") return self ? 1 : 0;
+    if (typeof self == "boolean")
+        return self ? 1 : 0;
     return self;
 }
 
 - (int)intValue
 {
-    if (typeof self == "boolean") return self ? 1 : 0;
+    if (typeof self == "boolean")
+        return self ? 1 : 0;
     return self;
 }
 
 - (long long)longLongValue
 {
-    if (typeof self == "boolean") return self ? 1 : 0;
+    if (typeof self == "boolean")
+        return self ? 1 : 0;
     return self;
 }
 
 - (long)longValue
 {
-    if (typeof self == "boolean") return self ? 1 : 0;
+    if (typeof self == "boolean")
+        return self ? 1 : 0;
     return self;
 }
 
 - (short)shortValue
 {
-    if (typeof self == "boolean") return self ? 1 : 0;
+    if (typeof self == "boolean")
+        return self ? 1 : 0;
     return self;
 }
 
 - (CPString)stringValue
 {
-    return toString();
+    return self.toString();
 }
 
 - (unsigned char)unsignedCharValue
@@ -280,7 +289,8 @@ FIXME: Do we need this?
 
 - (unsigned int)unsignedIntValue
 {
-    if (typeof self == "boolean") return self ? 1 : 0;
+    if (typeof self == "boolean")
+        return self ? 1 : 0;
     return self;
 }
 /*
@@ -292,20 +302,27 @@ FIXME: Do we need this?
 */
 - (unsigned long)unsignedLongValue
 {
-    if (typeof self == "boolean") return self ? 1 : 0;
+    if (typeof self == "boolean")
+        return self ? 1 : 0;
     return self;
 }
 
 - (unsigned short)unsignedShortValue
 {
-    if (typeof self == "boolean") return self ? 1 : 0;
+    if (typeof self == "boolean")
+        return self ? 1 : 0;
     return self;
 }
 
 - (CPComparisonResult)compare:(CPNumber)aNumber
 {
-    if (self > aNumber) return CPOrderedDescending;
-    else if (self < aNumber) return CPOrderedAscending;
+    if (aNumber === nil || aNumber['isa'] === CPNull)
+        [CPException raise:CPInvalidArgumentException reason:"nil argument"];
+
+    if (self > aNumber)
+        return CPOrderedDescending;
+    else if (self < aNumber)
+        return CPOrderedAscending;
 
     return CPOrderedSame;
 }

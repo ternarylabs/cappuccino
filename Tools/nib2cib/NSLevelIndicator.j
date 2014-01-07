@@ -22,6 +22,9 @@
 
 @import <AppKit/CPLevelIndicator.j>
 
+@import "NSCell.j"
+
+
 @implementation CPLevelIndicator (CPCoding)
 
 - (id)NS_initWithCoder:(CPCoder)aCoder
@@ -32,22 +35,17 @@
     _minValue = [cell minValue];
     _maxValue = [cell maxValue];
 
-    self = [super NS_initWithCoder:aCoder];
-
-    if (self)
-    {
-        self = [self NS_initWithCell:cell];
-    }
-
-    return self;
+    return [super NS_initWithCoder:aCoder];
 }
 
 /*!
     Intialise the receiver given a cell. This method is meant for reuse by controls which contain
     cells other than CPLevelIndicator itself.
 */
-- (id)NS_initWithCell:(NSCell)cell
+- (void)NS_initWithCell:(NSCell)cell
 {
+    [super NS_initWithCell:cell];
+
     _minValue = [cell minValue];
     _maxValue = [cell maxValue];
     _levelIndicatorStyle = [cell levelIndicatorStyle];
@@ -60,8 +58,6 @@
     [self setEditable:[cell isEditable]];
     [self setEnabled:[cell isEnabled]];
     [self setContinuous:[cell isContinuous]];
-
-    return self;
 }
 
 @end
@@ -72,7 +68,15 @@
 
 - (id)initWithCoder:(CPCoder)aCoder
 {
-    return [self NS_initWithCoder:aCoder];
+    self = [self NS_initWithCoder:aCoder];
+
+    if (self)
+    {
+        var cell = [aCoder decodeObjectForKey:@"NSCell"];
+        [self NS_initWithCell:cell];
+    }
+
+    return self;
 }
 
 - (Class)classForKeyedArchiver
@@ -102,17 +106,17 @@
     {
         _objectValue        = [aCoder decodeDoubleForKey:@"NSValue"];
 
-        _minValue           = [aCoder decodeDoubleForKey:@"NSMinValue"] || 0;
+        _minValue           = [aCoder decodeDoubleForKey:@"NSMinValue"];
         _maxValue           = [aCoder decodeDoubleForKey:@"NSMaxValue"];
         _warningValue       = [aCoder decodeDoubleForKey:@"NSWarningValue"];
         _criticalValue      = [aCoder decodeDoubleForKey:@"NSCriticalValue"];
 
-        _levelIndicatorStyle = [aCoder decodeIntForKey:@"NSIndicatorStyle"] || 0;
+        _levelIndicatorStyle = [aCoder decodeIntForKey:@"NSIndicatorStyle"];
 
         // None of these are included in the XIB if the defaults are used.
-        _tickMarkPosition   = [aCoder decodeIntForKey:@"NSTickMarkPosition"] || 0;
-        _numberOfTickMarks  = [aCoder decodeIntForKey:@"NSNumberOfTickMarks"] || 0;
-        _numberOfTickMarks  = [aCoder decodeIntForKey:@"NSNumberOfMajorTickMarks"] || 0;
+        _tickMarkPosition   = [aCoder decodeIntForKey:@"NSTickMarkPosition"];
+        _numberOfTickMarks  = [aCoder decodeIntForKey:@"NSNumberOfTickMarks"];
+        _numberOfTickMarks  = [aCoder decodeIntForKey:@"NSNumberOfMajorTickMarks"];
     }
 
     return self;

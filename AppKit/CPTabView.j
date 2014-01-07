@@ -88,9 +88,6 @@ var CPTabViewDidSelectTabViewItemSelector           = 1,
     _box = [[CPBox alloc] initWithFrame:[self  bounds]];
     [self setBackgroundColor:[CPColor colorWithCalibratedWhite:0.95 alpha:1.0]];
 
-    [_box setAutoresizingMask:CPViewWidthSizable | CPViewHeightSizable];
-    [_tabs setAutoresizingMask:CPViewMinXMargin | CPViewMaxXMargin];
-
     [self addSubview:_box];
     [self addSubview:_tabs];
 }
@@ -110,7 +107,7 @@ var CPTabViewDidSelectTabViewItemSelector           = 1,
     @param aTabViewItem the item to insert
     @param anIndex the index for the item
 */
-- (void)insertTabViewItem:(CPTabViewItem)aTabViewItem atIndex:(unsigned)anIndex
+- (void)insertTabViewItem:(CPTabViewItem)aTabViewItem atIndex:(CPUInteger)anIndex
 {
     [_items insertObject:aTabViewItem atIndex:anIndex];
 
@@ -186,7 +183,7 @@ var CPTabViewDidSelectTabViewItemSelector           = 1,
     Returns the CPTabViewItem at the specified index.
     @return a tab view item, or nil
 */
-- (CPTabViewItem)tabViewItemAtIndex:(unsigned)anIndex
+- (CPTabViewItem)tabViewItemAtIndex:(CPUInteger)anIndex
 {
     return [_items objectAtIndex:anIndex];
 }
@@ -273,7 +270,7 @@ var CPTabViewDidSelectTabViewItemSelector           = 1,
     Selects the item at the specified index.
     @param anIndex the index of the item to display.
 */
-- (BOOL)selectTabViewItemAtIndex:(unsigned)anIndex
+- (BOOL)selectTabViewItemAtIndex:(CPUInteger)anIndex
 {
     if (anIndex === _selectedIndex)
         return;
@@ -343,21 +340,9 @@ var CPTabViewDidSelectTabViewItemSelector           = 1,
     _type = aTabViewType;
 
     if (_type !== CPTopTabsBezelBorder && _type !== CPBottomTabsBezelBorder)
-    {
-        [_box setFrame:[self bounds]];
         [_tabs removeFromSuperview];
-    }
     else
-    {
-        var aFrame = [self frame],
-            segmentedHeight = CGRectGetHeight([_tabs frame]),
-            origin = _type === CPTopTabsBezelBorder ? segmentedHeight / 2 : 0;
-
-        [_box setFrame:CGRectMake(0, origin, CGRectGetWidth(aFrame),
-                                  CGRectGetHeight(aFrame) - segmentedHeight / 2)];
-
         [self addSubview:_tabs];
-    }
 
     switch (_type)
     {
@@ -372,6 +357,29 @@ var CPTabViewDidSelectTabViewItemSelector           = 1,
         case CPNoTabsNoBorder:
             [_box setBorderType:CPNoBorder];
             break;
+    }
+
+    [self setNeedsLayout];
+}
+
+- (void)layoutSubviews
+{
+    // Even if CPTabView's autoresizesSubviews is NO, _tabs and _box has to be laid out.
+    // This means we can't rely on autoresize masks.
+    if (_type !== CPTopTabsBezelBorder && _type !== CPBottomTabsBezelBorder)
+    {
+        [_box setFrame:[self bounds]];
+    }
+    else
+    {
+        var aFrame = [self frame],
+            segmentedHeight = CGRectGetHeight([_tabs frame]),
+            origin = _type === CPTopTabsBezelBorder ? segmentedHeight / 2 : 0;
+
+        [_box setFrame:CGRectMake(0, origin, CGRectGetWidth(aFrame),
+                                   CGRectGetHeight(aFrame) - segmentedHeight / 2)];
+
+        [self _repositionTabs];
     }
 }
 
@@ -451,10 +459,10 @@ var CPTabViewDidSelectTabViewItemSelector           = 1,
 - (void)_setSelectedIndex:(CPNumber)index
 {
     _selectedIndex = index;
-    [self _setContentViewForItem:[_items objectAtIndex:_selectedIndex]];
+    [self _setContentViewFromItem:[_items objectAtIndex:_selectedIndex]];
 }
 
-- (void)_setContentViewForItem:(CPTabViewItem)anItem
+- (void)_setContentViewFromItem:(CPTabViewItem)anItem
 {
     [_box setContentView:[anItem view]];
 }
@@ -471,9 +479,7 @@ var CPTabViewDidSelectTabViewItemSelector           = 1,
     }
 
     if (_selectedIndex === CPNotFound)
-    {
         [self selectFirstTabViewItem:self];
-    }
 }
 
 @end
@@ -498,24 +504,43 @@ var CPTabViewItemsKey               = "CPTabViewItemsKey",
         _items = [aCoder decodeObjectForKey:CPTabViewItemsKey];
         [_items makeObjectsPerformSelector:@selector(_setTabView:) withObject:self];
 
-        [self _updateItems];
-        [self _repositionTabs];
-
         [self setDelegate:[aCoder decodeObjectForKey:CPTabViewDelegateKey]];
 
-        var selected = [aCoder decodeObjectForKey:CPTabViewSelectedItemKey];
-        if (selected)
-            [self selectTabViewItem:selected];
-
-        [self setTabViewType:[aCoder decodeIntForKey:CPTabViewTypeKey]];
+        self.selectOnAwake = [aCoder decodeObjectForKey:CPTabViewSelectedItemKey];
+        _type = [aCoder decodeIntForKey:CPTabViewTypeKey];
     }
 
     return self;
 }
 
+- (void)awakeFromCib
+{
+    // This cannot be run in initWithCoder because it might call selectTabViewItem:, which is
+    // not safe to call before the views of the tab views items are fully decoded.
+    [self _updateItems];
+
+    if (self.selectOnAwake)
+    {
+        [self selectTabViewItem:self.selectOnAwake];
+        delete self.selectOnAwake;
+    }
+
+    var type = _type;
+    _type = nil;
+    [self setTabViewType:type];
+
+    [self setNeedsLayout];
+}
+
 - (void)encodeWithCoder:(CPCoder)aCoder
 {
+    // Don't bother to encode the CPBox. We will recreate it on decode and its content view is already
+    // stored by the tab view item. Not encoding _box makes the resulting archive smaller and reduces
+    // the surface for decoding bugs (of which we've had many in tab view).
+    var subviews = [self subviews];
+    [_box removeFromSuperview];
     [super encodeWithCoder:aCoder];
+    [self setSubviews:subviews];
 
     [aCoder encodeObject:_items forKey:CPTabViewItemsKey];
 

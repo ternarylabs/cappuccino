@@ -20,8 +20,10 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
-
 @import <AppKit/CPTableView.j>
+
+@class Nib2Cib
+
 
 @implementation CPTableView (NSCoding)
 
@@ -40,7 +42,13 @@
 
         // Convert xib default to cib default
         if (_rowHeight == 17)
-            _rowHeight = 23;
+        {
+            var theme = [Nib2Cib defaultTheme],
+                height = [theme valueForAttributeWithName:@"default-row-height" forClass:CPTableView];
+
+            _rowHeight = height;
+        }
+
 
         _headerView = [aCoder decodeObjectForKey:@"NSHeaderView"];
 
@@ -56,20 +64,18 @@
         _tableColumns = [aCoder decodeObjectForKey:@"NSTableColumns"];
         [_tableColumns makeObjectsPerformSelector:@selector(setTableView:) withObject:self];
 
+        _archivedDataViews = [aCoder decodeObjectForKey:@"NSTableViewArchivedReusableViewsKey"];
+
         _intercellSpacing = CGSizeMake([aCoder decodeFloatForKey:@"NSIntercellSpacingWidth"],
                                        [aCoder decodeFloatForKey:@"NSIntercellSpacingHeight"]);
 
-        var gridColor = [aCoder decodeObjectForKey:@"NSGridColor"];
-
-        if (![gridColor isEqual:[CPColor colorWithRed:127.0 / 255.0 green:127.0 / 255.0 blue:127.0 / 255.0 alpha:1.0]])
-            [self setValue:gridColor forThemeAttribute:@"grid-color"];
-
+        [self setValue:[aCoder decodeObjectForKey:@"NSGridColor"] forThemeAttribute:@"grid-color"];
         _gridStyleMask = [aCoder decodeIntForKey:@"NSGridStyleMask"];
 
         _usesAlternatingRowBackgroundColors = (flags & 0x00800000) ? YES : NO;
         _alternatingRowBackgroundColors = [[CPColor whiteColor], [CPColor colorWithHexString:@"e4e7ff"]];
 
-        _selectionHighlightStyle = [aCoder decodeIntForKey:@"NSTableViewSelectionHighlightStyle"] || CPTableViewSelectionHighlightStyleRegular;
+        _selectionHighlightStyle = [aCoder decodeIntForKey:@"NSTableViewSelectionHighlightStyle"];
         _columnAutoResizingStyle = [aCoder decodeIntForKey:@"NSColumnAutoresizingStyle"];
 
         _allowsMultipleSelection = (flags & 0x08000000) ? YES : NO;
@@ -93,7 +99,15 @@
 
 - (id)initWithCoder:(CPCoder)aCoder
 {
-    return [self NS_initWithCoder:aCoder];
+    self = [self NS_initWithCoder:aCoder];
+
+    if (self)
+    {
+        var cell = [aCoder decodeObjectForKey:@"NSCell"];
+        [self NS_initWithCell:cell];
+    }
+
+    return self;
 }
 
 - (Class)classForKeyedArchiver

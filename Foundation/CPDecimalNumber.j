@@ -123,13 +123,27 @@ var CPDefaultDcmHandler = nil;
 {
     if (!CPDefaultDcmHandler)
         CPDefaultDcmHandler = [[CPDecimalNumberHandler alloc] init];
+
     return CPDefaultDcmHandler;
 }
 
 @end
 
 // CPDecimalNumberBehaviors protocol
-@implementation CPDecimalNumberHandler (CPDecimalNumberBehaviors)
+
+@protocol CPDecimalNumberBehaviors
+
+- (CPRoundingMode)roundingMode;
+
+- (short)scale;
+    // The scale could return NO_SCALE for no defined scale.
+
+- (CPDecimalNumber)exceptionDuringOperation:(SEL)operation error:(CPCalculationError)error leftOperand:(CPDecimalNumber)leftOperand rightOperand:(CPDecimalNumber)rightOperand;
+    // Receiver can raise, return a new value, or return nil to ignore the exception.
+
+@end
+
+@implementation CPDecimalNumberHandler (CPDecimalNumberBehaviors) <CPDecimalNumberBehaviors>
 
 /*!
     Returns the current rounding mode. One of \e CPRoundingMode enum:
@@ -172,26 +186,37 @@ var CPDefaultDcmHandler = nil;
 {
     switch (error)
     {
-        case CPCalculationNoError:          break;
-        case CPCalculationOverflow:         if (_raiseOnOverflow)
-                                                [CPException raise:CPDecimalNumberOverflowException reason:("A CPDecimalNumber overflow has occurred. (Left operand= '" + [leftOperand  descriptionWithLocale:nil] + "' Right operand= '" + [rightOperand  descriptionWithLocale:nil] + "' Selector= '" + operation + "')") ];
-                                            else
-                                                return [CPDecimalNumber notANumber];
-                                            break;
-        case CPCalculationUnderflow:        if (_raiseOnUnderflow)
-                                                [CPException raise:CPDecimalNumberUnderflowException reason:("A CPDecimalNumber underflow has occurred. (Left operand= '" + [leftOperand  descriptionWithLocale:nil] + "' Right operand= '" + [rightOperand  descriptionWithLocale:nil] + "' Selector= '" + operation + "')") ];
-                                            else
-                                                return [CPDecimalNumber notANumber];
-                                            break;
-        case CPCalculationLossOfPrecision:  if (_raiseOnExactness)
-                                                [CPException raise:CPDecimalNumberExactnessException reason:("A CPDecimalNumber has been rounded off during a calculation. (Left operand= '" + [leftOperand  descriptionWithLocale:nil] + "' Right operand= '" + [rightOperand  descriptionWithLocale:nil] + "' Selector= '" + operation + "')") ];
-                                            break;
-        case CPCalculationDivideByZero:     if (_raiseOnDivideByZero)
-                                                [CPException raise:CPDecimalNumberDivideByZeroException reason:("A CPDecimalNumber divide by zero has occurred. (Left operand= '" + [leftOperand  descriptionWithLocale:nil] + "' Right operand= '" + [rightOperand  descriptionWithLocale:nil] + "' Selector= '" + operation + "')") ];
-                                            else
-                                                return [CPDecimalNumber notANumber]; // Div by zero returns NaN
-                                            break;
-        default:                            [CPException raise:CPInvalidArgumentException reason:("An unknown CPDecimalNumber error has occurred. (Left operand= '" + [leftOperand  descriptionWithLocale:nil] + "' Right operand= '" + [rightOperand  descriptionWithLocale:nil] + "' Selector= '" + operation + "')") ];
+        case CPCalculationNoError:
+            break;
+
+        case CPCalculationOverflow:
+            if (_raiseOnOverflow)
+                [CPException raise:CPDecimalNumberOverflowException reason:("A CPDecimalNumber overflow has occurred. (Left operand= '" + [leftOperand  descriptionWithLocale:nil] + "' Right operand= '" + [rightOperand  descriptionWithLocale:nil] + "' Selector= '" + operation + "')") ];
+            else
+                return [CPDecimalNumber notANumber];
+            break;
+
+        case CPCalculationUnderflow:
+            if (_raiseOnUnderflow)
+                [CPException raise:CPDecimalNumberUnderflowException reason:("A CPDecimalNumber underflow has occurred. (Left operand= '" + [leftOperand  descriptionWithLocale:nil] + "' Right operand= '" + [rightOperand  descriptionWithLocale:nil] + "' Selector= '" + operation + "')") ];
+            else
+                return [CPDecimalNumber notANumber];
+            break;
+
+        case CPCalculationLossOfPrecision:
+            if (_raiseOnExactness)
+                [CPException raise:CPDecimalNumberExactnessException reason:("A CPDecimalNumber has been rounded off during a calculation. (Left operand= '" + [leftOperand  descriptionWithLocale:nil] + "' Right operand= '" + [rightOperand  descriptionWithLocale:nil] + "' Selector= '" + operation + "')") ];
+            break;
+
+        case CPCalculationDivideByZero:
+            if (_raiseOnDivideByZero)
+                [CPException raise:CPDecimalNumberDivideByZeroException reason:("A CPDecimalNumber divide by zero has occurred. (Left operand= '" + [leftOperand  descriptionWithLocale:nil] + "' Right operand= '" + [rightOperand  descriptionWithLocale:nil] + "' Selector= '" + operation + "')") ];
+            else
+                return [CPDecimalNumber notANumber]; // Div by zero returns NaN
+            break;
+
+        default:
+            [CPException raise:CPInvalidArgumentException reason:("An unknown CPDecimalNumber error has occurred. (Left operand= '" + [leftOperand  descriptionWithLocale:nil] + "' Right operand= '" + [rightOperand  descriptionWithLocale:nil] + "' Selector= '" + operation + "')")];
     }
 
     return nil;
@@ -537,6 +562,7 @@ var CPDecimalNumberHandlerRoundingModeKey       = @"CPDecimalNumberHandlerRoundi
         if (res != nil)
             return res;
     }
+
     return [CPDecimalNumber decimalNumberWithDecimal:result];
 }
 
@@ -570,9 +596,11 @@ var CPDecimalNumberHandlerRoundingModeKey       = @"CPDecimalNumberHandlerRoundi
     if (error > CPCalculationNoError)
     {
         var res = [behavior exceptionDuringOperation:_cmd error:error leftOperand:self rightOperand:decimalNumber];
+
         if (res != nil)
             return res;
     }
+
     return [CPDecimalNumber decimalNumberWithDecimal:result];
 }
 
@@ -609,6 +637,7 @@ var CPDecimalNumberHandlerRoundingModeKey       = @"CPDecimalNumberHandlerRoundi
         if (res != nil)
             return res;
     }
+
     return [CPDecimalNumber decimalNumberWithDecimal:result];
 }
 
@@ -642,9 +671,11 @@ var CPDecimalNumberHandlerRoundingModeKey       = @"CPDecimalNumberHandlerRoundi
     if (error > CPCalculationNoError)
     {
         var res = [behavior exceptionDuringOperation:_cmd error:error leftOperand:self rightOperand:decimalNumber];
+
         if (res != nil)
             return res;
     }
+
     return [CPDecimalNumber decimalNumberWithDecimal:result];
 }
 
@@ -678,9 +709,11 @@ var CPDecimalNumberHandlerRoundingModeKey       = @"CPDecimalNumberHandlerRoundi
     if (error > CPCalculationNoError)
     {
         var res = [behavior exceptionDuringOperation:_cmd error:error leftOperand:self rightOperand:[CPDecimalNumber decimalNumberWithString:power.toString()]];
+
         if (res != nil)
             return res;
     }
+
     return [CPDecimalNumber decimalNumberWithDecimal:result];
 }
 
@@ -717,9 +750,11 @@ var CPDecimalNumberHandlerRoundingModeKey       = @"CPDecimalNumberHandlerRoundi
     if (error > CPCalculationNoError)
     {
         var res = [behavior exceptionDuringOperation:_cmd error:error leftOperand:self rightOperand:[CPDecimalNumber decimalNumberWithString:power.toString()]];
+
         if (res != nil)
             return res;
     }
+
     return [CPDecimalNumber decimalNumberWithDecimal:result];
 }
 
@@ -751,6 +786,7 @@ var CPDecimalNumberHandlerRoundingModeKey       = @"CPDecimalNumberHandlerRoundi
     // aNumber type is checked to convert if appropriate
     if (![aNumber isKindOfClass:[CPDecimalNumber class]])
         aNumber = [CPDecimalNumber decimalNumberWithString:aNumber.toString()];
+
     return CPDecimalCompare([self decimalValue], [aNumber decimalValue]);
 }
 

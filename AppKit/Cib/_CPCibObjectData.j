@@ -24,11 +24,15 @@
 @import <Foundation/CPObject.j>
 @import <Foundation/CPString.j>
 
-@import "CPCib.j"
+@import "CPCibBindingConnector.j"
 @import "CPCibConnector.j"
 @import "CPCibControlConnector.j"
+@import "CPCibHelpConnector.j"
 @import "CPCibOutletConnector.j"
-@import "CPCibBindingConnector.j"
+@import "CPCibRuntimeAttributesConnector.j"
+@import "CPClipView.j"
+
+@class CPScrollView
 
 
 @implementation _CPCibObjectData : CPObject
@@ -232,15 +236,15 @@ var _CPCibObjectDataNamesKeysKey                = @"_CPCibObjectDataNamesKeysKey
             {
                 _replacementObjects[[object UID]] = instantiatedObject;
 
-                if ([instantiatedObject isKindOfClass:[CPView class]])
+                if ([instantiatedObject isKindOfClass:CPView])
                 {
                     var clipView = [instantiatedObject superview];
 
-                    if ([clipView isKindOfClass:[CPClipView class]])
+                    if ([clipView isKindOfClass:CPClipView])
                     {
                         var scrollView = [clipView superview];
 
-                        if ([scrollView isKindOfClass:[CPScrollView class]])
+                        if ([scrollView isKindOfClass:CPScrollView])
                             [scrollView setDocumentView:instantiatedObject];
                     }
                 }
@@ -256,13 +260,9 @@ var _CPCibObjectDataNamesKeysKey                = @"_CPCibObjectDataNamesKeysKey
 {
     _replacementObjects[[_fileOwner UID]] = anOwner;
 
-    var index = 0,
-        count = _connections.length;
-
-    for (; index < count; ++index)
+    for (var i = 0, count = _connections.length; i < count; ++i)
     {
-        var connection = _connections[index];
-
+        var connection = _connections[i];
         [connection replaceObjects:_replacementObjects];
         [connection establishConnection];
     }

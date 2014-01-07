@@ -20,49 +20,47 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
+@import <AppKit/CPFont.j>
 @import <AppKit/CPTokenField.j>
 
 @import "NSControl.j"
 @import "NSCell.j"
 @import "NSTextField.j"
-@import <AppKit/CPFont.j>
 
 @implementation CPTokenField (NSCoding)
 
 - (id)NS_initWithCoder:(CPCoder)aCoder
 {
-    self = [super NS_initWithCoder:aCoder];
-
-    if (self)
-    {
-        var cell = [aCoder decodeObjectForKey:@"NSCell"];
-        self = [self NS_initWithCell:cell];
-    }
-
-    return self;
+    return [super NS_initWithCoder:aCoder];
 }
 
 /*!
     Intialise the receiver given a cell. This method is meant for reuse by controls which contain
     cells other than CPTokenField itself.
 */
-- (id)NS_initWithCell:(NSCell)cell
+- (void)NS_initWithCell:(NSCell)cell
 {
+    [super NS_initWithCell:cell];
+
     // Uncomment if we add support for token styles.
     // _style = [cell tokenStyle];
-
-    return self;
 }
 
 @end
 
 @implementation NSTokenField : CPTokenField
-{
-}
 
 - (id)initWithCoder:(CPCoder)aCoder
 {
-    return [self NS_initWithCoder:aCoder];
+    self = [self NS_initWithCoder:aCoder];
+
+    if (self)
+    {
+        var cell = [aCoder decodeObjectForKey:@"NSCell"];
+        [self NS_initWithCell:cell];
+    }
+
+    return self;
 }
 
 - (Class)classForKeyedArchiver
@@ -83,7 +81,7 @@
 
     if (self)
     {
-        _tokenStyle = [aCoder decodeObjectForKey:@"NSTokenStyle"] || 0;
+        _tokenStyle = [aCoder decodeIntForKey:@"NSTokenStyle"];
     }
 
     return self;

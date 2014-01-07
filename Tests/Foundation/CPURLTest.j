@@ -3,7 +3,7 @@
 var exampleProtocol = "http",
     exampleUser = "foo",
     examplePassword = "bar",
-    exampleHost = "cappuccino.org",
+    exampleHost = "cappuccino-project.org",
     examplePort = 80,
     exampleAuthority = exampleUser + ":" + examplePassword + "@" + exampleHost + ":" + examplePort,
     examplePathBase = "/contribute/",
@@ -103,6 +103,34 @@ var exampleProtocol = "http",
     [self assert:[url lastPathComponent] equals:examplePathRelative];
 }
 
+- (void)testUrlWithDoubleSlashRelativeToHttpUrl
+{
+    [self assert:"http://example2.com/b/a.html" equals:[[CPURL URLWithString:@"//example2.com/b/a.html" relativeToURL:[CPURL URLWithString:@"http://www.example.com/test/"]] absoluteString]];
+}
+
+- (void)testUrlWithDoubleSlashRelativeToHttpsUrl
+{
+    [self assert:"https://example2.com/b/a.html" equals:[[CPURL URLWithString:@"//example2.com/b/a.html" relativeToURL:[CPURL URLWithString:@"https://www.example.com/test/"]] absoluteString]];
+}
+
+- (void)testDeleteComponent
+{
+    var url = [CPURL URLWithString:exampleFullPath];
+
+    url = [url URLByDeletingLastPathComponent];
+    [self assert:[url absoluteString] equals:examplePathBase.substring(0, examplePathBase.length - 1)];
+
+    url = [url URLByDeletingLastPathComponent];
+    [self assert:[url absoluteString] equals:@"/"];
+
+    url = [url URLByDeletingLastPathComponent];
+    [self assert:[url absoluteString] equals:@"/"];
+
+    url = [CPURL URLWithString:@"foo"];
+    url = [url URLByDeletingLastPathComponent];
+    [self assert:[url absoluteString] equals:@""];
+}
+
 - (void)testURLToString
 {
     [self assert:String([CPURL URLWithString:exampleURL]) equals:exampleURL];
@@ -110,10 +138,10 @@ var exampleProtocol = "http",
 
 - (void)testIsEqual
 {
-    var url = [CPURL URLWithString:@"http://www.cappuccino.org"],
-        url2 = [CPURL URLWithString:@"http://www.cappuccino.org"],
-        url3 = [CPURL URLWithString:@"http://www.cappuccino.org/index.html"],
-        url4 = [CPURL URLWithString:@"http://www.cappuccino.org//index.html"];
+    var url = [CPURL URLWithString:@"http://www.cappuccino-project.org"],
+        url2 = [CPURL URLWithString:@"http://www.cappuccino-project.org"],
+        url3 = [CPURL URLWithString:@"http://www.cappuccino-project.org/index.html"],
+        url4 = [CPURL URLWithString:@"http://www.cappuccino-project.org//index.html"];
 
     [self assert:url equals:url];
     [self assert:url equals:url2];
@@ -124,9 +152,9 @@ var exampleProtocol = "http",
 
 - (void)testIsEqualToURL
 {
-    var url = [CPURL URLWithString:@"http://www.cappuccino.org"],
-        url2 = [CPURL URLWithString:@"http://www.cappuccino.org"],
-        url3 = [CPURL URLWithString:@"http://www.cappuccino.org/index.html"];
+    var url = [CPURL URLWithString:@"http://www.cappuccino-project.org"],
+        url2 = [CPURL URLWithString:@"http://www.cappuccino-project.org"],
+        url3 = [CPURL URLWithString:@"http://www.cappuccino-project.org/index.html"];
 
     [self assertTrue:[url isEqualToURL:url]];
     [self assertTrue:[url isEqualToURL:url2]];

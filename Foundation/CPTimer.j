@@ -25,6 +25,8 @@
 @import "CPObject.j"
 @import "CPRunLoop.j"
 
+#define CPTimerDefaultTimeInterval 0.1
+
 /*!
     @class CPTimer
     @ingroup foundation
@@ -112,7 +114,7 @@
 
     if (self)
     {
-        _timeInterval = seconds;
+        _timeInterval = (seconds <= 0) ? CPTimerDefaultTimeInterval : seconds;
         _invocation = anInvocation;
         _repeats = shouldRepeat;
         _isValid = YES;
@@ -150,7 +152,7 @@
 
     if (self)
     {
-        _timeInterval = seconds;
+        _timeInterval = (seconds <= 0) ? CPTimerDefaultTimeInterval : seconds;
         _callback = aFunction;
         _repeats = shouldRepeat;
         _isValid = YES;
@@ -245,14 +247,31 @@ var _CPTimerBridgeTimer = function(codeOrFunction, aDelay, shouldRepeat, functio
         theFunction = nil;
 
     if (typeof codeOrFunction === "string")
-        theFunction = function() { new Function(codeOrFunction)(); if (!shouldRepeat) CPTimersForTimeoutIDs[timeoutID] = nil; }
+    {
+        theFunction = function()
+        {
+            new Function(codeOrFunction)();
+
+            if (!shouldRepeat)
+                CPTimersForTimeoutIDs[timeoutID] = nil;
+        }
+    }
     else
     {
         if (!functionArgs)
             functionArgs = [];
 
-        theFunction = function() { codeOrFunction.apply(window, functionArgs); if (!shouldRepeat) CPTimersForTimeoutIDs[timeoutID] = nil; }
+        theFunction = function()
+        {
+            codeOrFunction.apply(window, functionArgs);
+
+            if (!shouldRepeat)
+                CPTimersForTimeoutIDs[timeoutID] = nil;
+        }
     }
+
+    // A call such as setTimeout(f) is technically invalid but browsers seem to treat it as setTimeout(f, 0), so so will we.
+    aDelay = aDelay | 0.0;
 
     CPTimersForTimeoutIDs[timeoutID] = [CPTimer scheduledTimerWithTimeInterval:aDelay / 1000 callback:theFunction repeats:shouldRepeat];
 

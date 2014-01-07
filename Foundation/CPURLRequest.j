@@ -54,7 +54,16 @@
 }
 
 /*!
-    Initializes the request with a URL.
+    Equal to `[receiver initWithURL:nil]`.
+*/
+- (id)init
+{
+    return [self initWithURL:nil];
+}
+
+/*!
+    Initializes the request with a URL. This is the designated initializer.
+
     @param aURL the url to set
     @return the initialized CPURLRequest
 */
@@ -68,7 +77,7 @@
 
         _HTTPBody = @"";
         _HTTPMethod = @"GET";
-        _HTTPHeaderFields = [CPDictionary dictionary];
+        _HTTPHeaderFields = @{};
 
         [self setValue:"Thu, 01 Jan 1970 00:00:00 GMT" forHTTPHeaderField:"If-Modified-Since"];
         [self setValue:"no-cache" forHTTPHeaderField:"Cache-Control"];

@@ -20,16 +20,22 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
-
 @import "Converter.j"
+@import "Nib2CibKeyedUnarchiver.j"
+@import "NSFont.j"
+
+@class Nib2Cib
 
 @implementation Converter (Mac)
 
-- (void)convertedDataFromMacData:(CPData)data resourcesPath:(CPString)aResourcesPath
+- (void)convertedDataFromMacData:(CPData)data
 {
     // Unarchive the NS data
-    var unarchiver = [[Nib2CibKeyedUnarchiver alloc] initForReadingWithData:data resourcesPath:aResourcesPath],
-        objectData = [unarchiver decodeObjectForKey:@"IB.objectdata"],
+    var unarchiver = [[Nib2CibKeyedUnarchiver alloc] initForReadingWithData:data];
+
+    [unarchiver setDelegate:self];
+
+    var objectData = [unarchiver decodeObjectForKey:@"IB.objectdata"],
         objects = [unarchiver allObjects],
         count = [objects count];
 
@@ -42,34 +48,9 @@
 
         [self replaceFontForObject:object];
 
-        if (![object isKindOfClass:[CPView class]])
-            continue;
-
-        var superview = [object superview];
-
-        if (!superview || [superview NS_isFlipped])
-            continue;
-
-        var superviewHeight = CGRectGetHeight([superview bounds]),
-            frame = [object frame];
-
-        [object setFrameOrigin:CGPointMake(CGRectGetMinX(frame), superviewHeight - CGRectGetMaxY(frame))];
-
-        var NS_autoresizingMask = [object autoresizingMask];
-
-        autoresizingMask = NS_autoresizingMask & ~(CPViewMaxYMargin | CPViewMinYMargin);
-
-        if (!(NS_autoresizingMask & (CPViewMaxYMargin | CPViewMinYMargin | CPViewHeightSizable)))
-            autoresizingMask |= CPViewMinYMargin;
-        else
-        {
-            if (NS_autoresizingMask & CPViewMaxYMargin)
-                autoresizingMask |= CPViewMinYMargin;
-            if (NS_autoresizingMask & CPViewMinYMargin)
-                autoresizingMask |= CPViewMaxYMargin;
-        }
-
-        [object setAutoresizingMask:autoresizingMask];
+        // Give the object a chance to do any final rewiring before being saved back.
+        if ([object respondsToSelector:@selector(awakeFromNib)])
+            [object awakeFromNib];
     }
 
     // Re-archive the CP data.
@@ -80,6 +61,14 @@
     [archiver finishEncoding];
 
     return convertedData;
+}
+
+- (Class)unarchiver:(CPKeyedUnarchiver)unarchiver cannotDecodeObjectOfClassName:(CPString)name originalClasses:(CPArray)classNames
+{
+    // The CPKeyedUnarchiver exception message is accurate, but not that helpful to nib2cib users.
+    // We will raise our own exception.
+
+    [CPException raise:CPInvalidUnarchiveOperationException format:@"%@ objects are not supported by nib2cib.", name];
 }
 
 - (void)replaceFontForObject:(id)object
@@ -118,10 +107,10 @@
 {
     var cibFont = nil;
 
-    if ([object respondsToSelector:@selector(cibFontForNibFont)])
-        cibFont = [object cibFontForNibFont];
+    if ([object respondsToSelector:@selector(cibFontForNibFont:)])
+        cibFont = [object cibFontForNibFont:[object font]];
     else
-        cibFont = [NSFont cibFontForNibFont:[object font]];
+        cibFont = [[object font] cibFontForNibFont];
 
     if (!cibFont || ![cibFont isEqual:nibFont])
     {
@@ -130,7 +119,8 @@
         // nil cibFont means try to use theme font
         if (!cibFont)
         {
-            var bold = [nibFont isBold];
+            var bold = [nibFont isBold],
+                themes = [[Nib2Cib sharedNib2Cib] themes];
 
             for (var i = 0; i < themes.length; ++i)
             {
@@ -143,22 +133,24 @@
                 }
             }
 
-            // Substitute legacy theme fonts for the current system font
-            if (!cibFont || [cibFont familyName] === CPFontDefaultSystemFontFace)
+            if (!cibFont || [cibFont isSystem])
             {
-                var size = [cibFont size] || CPFontDefaultSystemFontSize,
-                    bold = cibFont ? [cibFont isBold] : bold;
+                var size = [cibFont size] || CPFontDefaultSystemFontSize;
+
+                bold = cibFont ? [cibFont isBold] : bold;
 
                 if (size === CPFontDefaultSystemFontSize)
-                    size = [CPFont systemFontSize];
+                    size = CPFontCurrentSystemSize;
 
                 cibFont = bold ? [CPFont boldSystemFontOfSize:size] : [CPFont systemFontOfSize:size];
             }
         }
 
+        var replacement = "System " + (bold ? "bold " : "") + ([cibFont isSystemSize] ? "(current size)" : [cibFont size]);
+
         [object setFont:cibFont];
 
-        CPLog.debug("%s: substituted <%s>%s for <%fpx %s>", [object className], cibFont ? [cibFont cssString] : "theme default", source, [nibFont size], [nibFont familyName]);
+        CPLog.debug("%s: substituted <%s>%s for <%s>", [object className], replacement || [NSFont descriptorForFont:cibFont], source, [NSFont descriptorForFont:nibFont]);
     }
 }
 

@@ -27,8 +27,13 @@
 @import "CPSortDescriptor.j"
 @import "CPURL.j"
 @import "CPValue.j"
+@import "CPNull.j"
 
-#define _CPMaxRange(aRange) ((aRange).location + (aRange).length)
+@class CPException
+@class CPURL
+
+@global CPInvalidArgumentException
+@global CPRangeException
 
 /*!
     A case insensitive search
@@ -66,9 +71,9 @@ CPNumericSearch         = 64;
 */
 CPDiacriticInsensitiveSearch = 128;
 
-var CPStringUIDs        = new CFMutableDictionary();
+var CPStringUIDs = new CFMutableDictionary(),
 
-var CPStringRegexSpecialCharacters = [
+    CPStringRegexSpecialCharacters = [
       '/', '.', '*', '+', '?', '|', '$', '^',
       '(', ')', '[', ']', '{', '}', '\\'
     ],
@@ -194,16 +199,16 @@ var CPStringRegexSpecialCharacters = [
 */
 - (int)length
 {
-    return length;
+    return self.length;
 }
 
 /*!
     Returns the character at the specified index.
     @param anIndex the index of the desired character
 */
-- (CPString)characterAtIndex:(unsigned)anIndex
+- (CPString)characterAtIndex:(CPUInteger)anIndex
 {
-    return charAt(anIndex);
+    return self.charAt(anIndex);
 }
 
 // Combining strings
@@ -244,17 +249,17 @@ var CPStringRegexSpecialCharacters = [
     @param anIndex the index of the padding string to start from (if necessary to use)
     @return the new padded string
 */
-- (CPString)stringByPaddingToLength:(unsigned)aLength withString:(CPString)aString startingAtIndex:(unsigned)anIndex
+- (CPString)stringByPaddingToLength:(unsigned)aLength withString:(CPString)aString startingAtIndex:(CPUInteger)anIndex
 {
-    if (length == aLength)
+    if (self.length == aLength)
         return self;
 
-    if (aLength < length)
-        return substr(0, aLength);
+    if (aLength < self.length)
+        return self.substr(0, aLength);
 
     var string = self,
         substring = aString.substring(anIndex),
-        difference = aLength - length;
+        difference = aLength - self.length;
 
     while ((difference -= substring.length) >= 0)
         string += substring;
@@ -279,7 +284,7 @@ var CPStringRegexSpecialCharacters = [
 */
 - (CPArray)componentsSeparatedByString:(CPString)aString
 {
-    return split(aString);
+    return self.split(aString);
 }
 
 /*!
@@ -289,7 +294,7 @@ var CPStringRegexSpecialCharacters = [
 */
 - (CPString)substringFromIndex:(unsigned)anIndex
 {
-    return substr(anIndex);
+    return self.substr(anIndex);
 }
 
 /*!
@@ -299,10 +304,10 @@ var CPStringRegexSpecialCharacters = [
 */
 - (CPString)substringWithRange:(CPRange)aRange
 {
-    if (aRange.location < 0 || _CPMaxRange(aRange) > length)
+    if (aRange.location < 0 || CPMaxRange(aRange) > self.length)
         [CPException raise:CPRangeException reason:"aRange out of bounds"];
 
-    return substr(aRange.location, aRange.length);
+    return self.substr(aRange.location, aRange.length);
 }
 
 /*!
@@ -314,10 +319,10 @@ var CPStringRegexSpecialCharacters = [
 */
 - (CPString)substringToIndex:(unsigned)anIndex
 {
-    if (anIndex > length)
+    if (anIndex > self.length)
         [CPException raise:CPRangeException reason:"index out of bounds"];
 
-    return substring(0, anIndex);
+    return self.substring(0, anIndex);
 }
 
 // Finding characters and substrings
@@ -436,9 +441,9 @@ var CPStringRegexSpecialCharacters = [
 
 - (CPString)stringByReplacingOccurrencesOfString:(CPString)target withString:(CPString)replacement options:(int)options range:(CPRange)searchRange
 {
-    var start = substring(0, searchRange.location),
-        stringSegmentToSearch = substr(searchRange.location, searchRange.length),
-        end = substring(searchRange.location + searchRange.length, self.length),
+    var start = self.substring(0, searchRange.location),
+        stringSegmentToSearch = self.substr(searchRange.location, searchRange.length),
+        end = self.substring(searchRange.location + searchRange.length, self.length),
         target = [target stringByEscapingRegexControlCharacters],
         regExp;
 
@@ -459,7 +464,7 @@ var CPStringRegexSpecialCharacters = [
 
 - (CPString)stringByReplacingCharactersInRange:(CPRange)range withString:(CPString)replacement
 {
-    return '' + substring(0, range.location) + replacement + substring(range.location + range.length, self.length);
+    return '' + self.substring(0, range.location) + replacement + self.substring(range.location + range.length, self.length);
 }
 
 /*!
@@ -492,6 +497,9 @@ var CPStringRegexSpecialCharacters = [
     return [self compare:aString options:CPCaseInsensitiveSearch];
 }
 
+// This is for speed
+var CPStringNull = [CPNull null];
+
 /*!
     Compares the receiver to the specified string, using options.
     @param aString the string with which to compare
@@ -500,6 +508,12 @@ var CPStringRegexSpecialCharacters = [
 */
 - (CPComparisonResult)compare:(CPString)aString options:(int)aMask
 {
+    if (aString === nil)
+        return CPOrderedDescending;
+
+    if (aString === CPStringNull)
+        [CPException raise:CPInvalidArgumentException reason:"compare: argument can't be 'CPNull'"];
+
     var lhs = self,
         rhs = aString;
 
@@ -546,17 +560,17 @@ var CPStringRegexSpecialCharacters = [
 */
 - (BOOL)hasPrefix:(CPString)aString
 {
-    return aString && aString != "" && indexOf(aString) == 0;
+    return aString && aString != "" && self.indexOf(aString) == 0;
 }
 
 /*!
-    Returns \c NO if the receiver ends
+    Returns \c YES if the receiver ends
     with the specified string. If \c aString
     is empty, the method will return \c NO.
 */
 - (BOOL)hasSuffix:(CPString)aString
 {
-    return aString && aString != "" && length >= aString.length && lastIndexOf(aString) == (length - aString.length);
+    return aString && aString != "" && self.length >= aString.length && self.lastIndexOf(aString) == (self.length - aString.length);
 }
 
 - (BOOL)isEqual:(id)anObject
@@ -582,7 +596,7 @@ var CPStringRegexSpecialCharacters = [
 /*!
     Returns a hash of the string instance.
 */
-- (unsigned)UID
+- (CPString)UID
 {
     var UID = CPStringUIDs.valueForKey(self);
 
@@ -624,9 +638,9 @@ var CPStringRegexSpecialCharacters = [
         rhs = [rhs lowercaseString];
     }
 
-    for (; len < min; len++ )
+    for (; len < min; len++)
     {
-        if ( [lhs characterAtIndex:len] !== [rhs characterAtIndex:len] )
+        if ([lhs characterAtIndex:len] !== [rhs characterAtIndex:len])
             break;
     }
 
@@ -657,7 +671,7 @@ var CPStringRegexSpecialCharacters = [
 */
 - (CPString)lowercaseString
 {
-    return toLowerCase();
+    return self.toLowerCase();
 }
 
 /*!
@@ -665,7 +679,7 @@ var CPStringRegexSpecialCharacters = [
 */
 - (CPString)uppercaseString
 {
-    return toUpperCase();
+    return self.toUpperCase();
 }
 
 /*!
@@ -706,14 +720,77 @@ var CPStringRegexSpecialCharacters = [
     Returns an the path components of this string. This
     method assumes that the string's content is a '/'
     separated file system path.
+    Multiple '/' separators between components are truncated to a single one.
 */
 - (CPArray)pathComponents
 {
-    var result = split('/');
+    if (self.length === 0)
+        return [""];
+
+    if (self === "/")
+        return ["/"];
+
+    var result = self.split('/');
+
     if (result[0] === "")
         result[0] = "/";
-    if (result[result.length - 1] === "")
-        result.pop();
+
+    var index = result.length - 1;
+
+    if (index > 0)
+    {
+        if (result[index] === "")
+            result[index] = "/";
+
+        while (index--)
+        {
+            while (result[index] === "")
+                result.splice(index--, 1);
+        }
+    }
+
+    return result;
+}
+
+/*!
+    Returns a string built from the strings in a given array by
+    concatenating them with a path separator between each pair.
+    This method assumes that the string's content is a '/'
+    separated file system path.
+    Multiple '/' separators between components are truncated to a single one.
+*/
++ (CPString)pathWithComponents:(CPArray)components
+{
+    var size = components.length,
+        result = "",
+        i = -1,
+        firstRound = true,
+        firstIsSlash = false;
+
+    while (++i < size)
+    {
+        var component = components[i],
+            lenMinusOne = component.length - 1;
+
+        if (lenMinusOne >= 0 && (component !== "/" || firstRound))  // Skip "" and "/" (not first time)
+        {
+            if (lenMinusOne > 0 && component.indexOf("/",lenMinusOne) === lenMinusOne) // Ends with "/"
+                component = component.substring(0, lenMinusOne);
+
+            if (firstRound)
+            {
+                if (component === "/")
+                    firstIsSlash = true;
+                firstRound = false;
+            }
+            else if (!firstIsSlash)
+                result += "/";
+            else
+                firstIsSlash = false;
+
+            result += component;
+        }
+    }
     return result;
 }
 
@@ -724,10 +801,10 @@ var CPStringRegexSpecialCharacters = [
 */
 - (CPString)pathExtension
 {
-    if (lastIndexOf('.') === CPNotFound)
+    if (self.lastIndexOf('.') === CPNotFound)
         return "";
 
-    return substr(lastIndexOf('.') + 1);
+    return self.substr(self.lastIndexOf('.') + 1);
 }
 
 /*!
@@ -737,44 +814,90 @@ var CPStringRegexSpecialCharacters = [
 */
 - (CPString)lastPathComponent
 {
-    var components = [self pathComponents];
-    return components[components.length - 1];
+    var components = [self pathComponents],
+        lastIndex = components.length - 1,
+        lastComponent = components[lastIndex];
+
+    return lastIndex > 0 && lastComponent === "/" ? components[lastIndex - 1] : lastComponent;
+}
+
+/*!
+    Returns a new string made by appending to the receiver a given string
+    This method assumes that the string's content is a '/'
+    separated file system path.
+    Multiple '/' separators between components are truncated to a single one.
+*/
+- (CPString)stringByAppendingPathComponent:(CPString)aString
+{
+    var components = [self pathComponents],
+        addComponents = aString && aString !== "/" ? [aString pathComponents] : [];
+
+    return [CPString pathWithComponents:components.concat(addComponents)];
+}
+
+/*!
+    Returns a new string made by appending to the receiver an extension separator followed by a given extension
+    This method assumes that the extension separator is a '.'
+    Extension can't include a '/' character, receiver can't be empty or be just a '/'. If so the
+    result will be the receiver itself.
+    Multiple '/' separators between components are truncated to a single one.
+*/
+- (CPString)stringByAppendingPathExtension:(CPString)ext
+{
+    if (ext.indexOf('/') >= 0 || self.length === 0 || self === "/")  // Can't handle these
+        return self;
+
+    var components = [self pathComponents],
+        last = components.length - 1;
+
+    if (last > 0 && components[last] === "/")
+        components.splice(last--, 1);
+
+    components[last] = components[last] + "." + ext;
+
+    return [CPString pathWithComponents:components];
 }
 
 /*!
     Deletes the last path component of a string.
     This method assumes that the string's content is a '/'
     separated file system path.
+    Multiple '/' separators between components are truncated to a single one.
 */
 - (CPString)stringByDeletingLastPathComponent
 {
-    var path = self,
-        start = length - 1;
+    if (self.length === 0)
+        return "";
+    else if (self === "/")
+        return "/";
 
-    while (path.charAt(start) === '/')
-        start--;
+    var components = [self pathComponents],
+        last = components.length - 1;
 
-    path = path.substr(0, path.lastIndexOf('/', start));
+    if (components[last] === "/")
+        last--;
 
-    if (path === "" && charAt(0) === '/')
-        return '/';
+    components.splice(last, components.length - last);
 
-    return path;
+    return [CPString pathWithComponents:components];
 }
 
 /*!
     Deletes the extension of a string.
+    This method assumes that the string's content is a '/'
+    separated file system path.
+    Multiple '/' separators between components are truncated to a single one.
 */
 - (CPString)stringByDeletingPathExtension
 {
     var extension = [self pathExtension];
+
     if (extension === "")
         return self;
-
-    if (lastIndexOf('.') < 1)
+    else if (self.lastIndexOf('.') < 1)
         return self;
 
-    return substr(0, [self length] - (extension.length + 1));
+    return self.substr(0, [self length] - (extension.length + 1));
 }
 
 - (CPString)stringByStandardizingPath
@@ -784,6 +907,7 @@ var CPStringRegexSpecialCharacters = [
 }
 
 @end
+
 
 @implementation CPString (JSON)
 
@@ -824,12 +948,14 @@ var CPStringRegexSpecialCharacters = [
 
 @end
 
+
 var diacritics = [[192,198],[224,230],[231,231],[232,235],[236,239],[242,246],[249,252]], // Basic Latin ; Latin-1 Supplement.
     normalized = [65,97,99,101,105,111,117];
 
 String.prototype.stripDiacritics = function()
 {
     var output = "";
+
     for (var indexSource = 0; indexSource < this.length; indexSource++)
     {
         var code = this.charCodeAt(indexSource);

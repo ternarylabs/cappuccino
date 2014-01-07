@@ -22,7 +22,8 @@
 
 @import "CPException.j"
 @import "CPObject.j"
-@import "CPSet.j"
+@import "CPMutableSet.j"
+@import "CPNull.j"
 @import "_CPCollectionKVCOperators.j"
 
 @implementation CPObject (CPSetKVO)
@@ -167,7 +168,7 @@
     [_proxyObject setValue:anObject forKey:_key];
 }
 
-- (unsigned)count
+- (CPUInteger)count
 {
     if (_count)
         return _count(_proxyObject, _countSEL);

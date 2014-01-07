@@ -11,22 +11,25 @@
 
 
 @implementation AppController : CPObject
+{
+    CPTabView tabView1;
+}
 
 - (void)applicationDidFinishLaunching:(CPNotification)aNotification
 {
     var theWindow = [[CPWindow alloc] initWithContentRect:CGRectMakeZero() styleMask:CPBorderlessBridgeWindowMask],
         contentView = [theWindow contentView];
 
-    var tabView = [[CPTabView alloc] initWithFrame:CGRectMake(50,50,400,400)];
-    [tabView setTabViewType:CPNoTabsBezelBorder];
-    [tabView setTabViewType:CPTopTabsBezelBorder];
+    tabView1 = [[CPTabView alloc] initWithFrame:CGRectMake(50,50,400,400)];
+    [tabView1 setTabViewType:CPNoTabsBezelBorder];
+    [tabView1 setTabViewType:CPTopTabsBezelBorder];
 
     var tabs = [
         "First Tab", "a label",
         "Second Tab", "another label",
         "Third Tab", "a third label",
-        "Fourth Tab", "label 4",
-        /*"5th Tab", "label 5",
+        /*"Fourth Tab", "label 4",
+        "5th Tab", "label 5",
         "6th Tab", "label 6",
         "7th Tab", "label 7",*/
         ];
@@ -39,14 +42,31 @@
         var item = [[CPTabViewItem alloc] initWithIdentifier:tabs[i]];
         [item setView:view];
         [item setLabel:tabs[i]];
-        [tabView addTabViewItem:item];
+        [tabView1 addTabViewItem:item];
     }
 
-    [contentView addSubview:tabView];
+    [tabView1 setAutoresizingMask:CPViewWidthSizable | CPViewHeightSizable];
+    [contentView addSubview:tabView1];
 
-    [tabView setAutoresizingMask:CPViewWidthSizable | CPViewHeightSizable];
+    var insertedItem = [[CPTabViewItem alloc] initWithIdentifier:"inserted"];
+    [insertedItem setView:[CPView new]];
+    [insertedItem setLabel:"Inserted Tab"];
+    [tabView1 insertTabViewItem:insertedItem atIndex:2];
+
+    var toggleButton = [CPButton buttonWithTitle:@"Cycle Tab View Type"];
+    [toggleButton setAction:@selector(switchTabType:)];
+    [toggleButton setTarget:self];
+    [toggleButton sizeToFit];
+    [toggleButton setFrameOrigin:CGPointMake(CGRectGetWidth([contentView frame]) - CGRectGetWidth([toggleButton frame]) - 15, 15)];
+    [toggleButton setAutoresizingMask:CPViewMinXMargin | CPViewMaxYMargin];
+    [contentView addSubview:toggleButton];
 
     [theWindow orderFront:self];
+}
+
+- (@action)switchTabType:(id)sender
+{
+    [tabView1 setTabViewType:[tabView1 tabViewType] < CPNoTabsNoBorder ? [tabView1 tabViewType] + 1 : CPTopTabsBezelBorder];
 }
 
 @end

@@ -11,20 +11,16 @@
 
 @implementation AppController : CPObject
 {
-    CPWindow    theWindow; //this "outlet" is connected automatically by the Cib
-    CPArrayController arrayController;
-    CPTextField from;
-    CPTextField to;
-    
+    @outlet CPWindow    theWindow; //this "outlet" is connected automatically by the Cib
+
+    @outlet CPTextField locationField;
+    @outlet CPTextField lengthField;
+    @outlet CPPopUpButton KeyPathPopup;
+
     CPArray     rows @accessors;
 }
 
 - (void)applicationDidFinishLaunching:(CPNotification)aNotification
-{
-    // This is called when the application is done loading.
-}
-
-- (void)awakeFromCib
 {
     rows = [CPArray new];
 
@@ -32,7 +28,12 @@
         request = [CPURLRequest requestWithURL:path],
         connection = [CPURLConnection connectionWithRequest:request delegate:self];
 
-    [theWindow setFullBridge:YES];
+    [theWindow setFullPlatformWindow:YES];
+}
+
+- (void)awakeFromCib
+{
+    console.log(_cmd);
 }
 
 - (void)connection:(CPURLConnection)connection didReceiveData:(CPString)dataString
@@ -46,11 +47,22 @@
      [self setRows:theRows];
 }
 
-- (void)test:(id)sender
+- (IBAction)updateOrReloadContent:(id)sender
 {
-    var range = CPMakeRange([from intValue], [to intValue]);
-    var indexes = [CPIndexSet indexSetWithIndexesInRange:range];
-    
-    [[rows objectsAtIndexes:indexes] setValue:@"b" forKey:@"colTwo"];
+    var range = CPMakeRange([locationField intValue], [lengthField intValue]),
+        indexes = [CPIndexSet indexSetWithIndexesInRange:range],
+        keyPath = [KeyPathPopup titleOfSelectedItem];
+
+    var value = String.fromCharCode(97 + Math.round(Math.random() * 26));
+
+    if ([sender tag] == 1000)
+        [[rows objectsAtIndexes:indexes] setValue:value forKey:keyPath];
+    else
+    {
+        var rowsCopy = [rows copy];
+        [[rowsCopy objectsAtIndexes:indexes] setValue:value forKey:keyPath];
+        [self setRows:rowsCopy];
+    }
 }
+
 @end

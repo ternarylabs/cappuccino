@@ -20,22 +20,17 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
-@import "CPApplication.j"
+@import "CPDragServer_Constants.j"
 @import "CPEvent.j"
 @import "CPImageView.j"
 @import "CPPasteboard.j"
 @import "CPView.j"
-@import "CPWindow.j"
+@import "CPWindow_Constants.j"
 
+@class CPWindow  // This file is imported by CPWindow.j
+@class _CPDOMDataTransferPasteboard
 
-CPDragOperationNone     = 0;
-CPDragOperationCopy     = 1 << 1;
-CPDragOperationLink     = 1 << 1;
-CPDragOperationGeneric  = 1 << 2;
-CPDragOperationPrivate  = 1 << 3;
-CPDragOperationMove     = 1 << 4;
-CPDragOperationDelete   = 1 << 5;
-CPDragOperationEvery    = -1;
+@global CPApp
 
 #define DRAGGING_WINDOW(anObject) ([anObject isKindOfClass:[CPWindow class]] ? anObject : [anObject window])
 
@@ -72,7 +67,7 @@ var CPDragServerSource             = nil,
 - (unsigned)draggingSourceOperationMask
 */
 
-- (CPPoint)draggingLocation
+- (CGPoint)draggingLocation
 {
     return [[CPDragServer sharedDragServer] draggingLocation];
 }
@@ -168,7 +163,7 @@ var CPDraggingSource_draggedImage_movedTo_          = 1 << 0,
 
     if (self)
     {
-        _draggedWindow = [[CPWindow alloc] initWithContentRect:_CGRectMakeZero() styleMask:CPBorderlessWindowMask];
+        _draggedWindow = [[CPWindow alloc] initWithContentRect:CGRectMakeZero() styleMask:CPBorderlessWindowMask];
 
         [_draggedWindow setLevel:CPDraggingWindowLevel];
     }
@@ -206,7 +201,12 @@ var CPDraggingSource_draggedImage_movedTo_          = 1 << 0,
 - (void)draggingSourceUpdatedWithGlobalLocation:(CGPoint)aGlobalLocation
 {
     if (![CPPlatform supportsDragAndDrop])
-        [_draggedWindow setFrameOrigin:_CGPointMake(aGlobalLocation.x - _draggingOffset.width, aGlobalLocation.y - _draggingOffset.height)];
+    {
+        var frame = [_draggedWindow frame];
+        frame.origin.x = aGlobalLocation.x - _draggingOffset.width;
+        frame.origin.y = aGlobalLocation.y - _draggingOffset.height;
+        [_draggedWindow _setFrame:frame display:YES animate:NO constrainWidth:NO constrainHeight:NO];
+    }
 
     if (_implementedDraggingSourceMethods & CPDraggingSource_draggedImage_movedTo_)
         [_draggingSource draggedImage:[_draggedView image] movedTo:aGlobalLocation];
@@ -253,7 +253,7 @@ var CPDraggingSource_draggedImage_movedTo_          = 1 << 0,
             _draggingUpdateTimer = [CPTimer scheduledTimerWithTimeInterval:CPDragServerPeriodicUpdateInterval
                                                                     target:self
                                                                   selector:@selector(_sendPeriodicDraggingUpdate:)
-                                                                  userInfo:[CPDictionary dictionaryWithJSObject:{platformWindow:aPlatformWindow, location:aLocation}]
+                                                                  userInfo:@{ "platformWindow":aPlatformWindow, "location":aLocation }
                                                                    repeats:NO];
 
         var scrollView = [_draggingDestination isKindOfClass:[CPView class]] ? [_draggingDestination enclosingScrollView] : nil;
@@ -270,10 +270,10 @@ var CPDraggingSource_draggedImage_movedTo_          = 1 << 0,
             {
                 if ([scrollView hasVerticalScroller])
                 {
-                    if (eventLocation.y < _CGRectGetMinY(insetBounds))
-                        deltaY = _CGRectGetMinY(insetBounds) - eventLocation.y;
-                    else if (eventLocation.y > _CGRectGetMaxY(insetBounds))
-                        deltaY = _CGRectGetMaxY(insetBounds) - eventLocation.y;
+                    if (eventLocation.y < CGRectGetMinY(insetBounds))
+                        deltaY = CGRectGetMinY(insetBounds) - eventLocation.y;
+                    else if (eventLocation.y > CGRectGetMaxY(insetBounds))
+                        deltaY = CGRectGetMaxY(insetBounds) - eventLocation.y;
                     if (deltaY < -insetBounds.size.height)
                         deltaY = -insetBounds.size.height;
                     if (deltaY > insetBounds.size.height)
@@ -282,17 +282,17 @@ var CPDraggingSource_draggedImage_movedTo_          = 1 << 0,
 
                 if ([scrollView hasHorizontalScroller])
                 {
-                    if (eventLocation.x < _CGRectGetMinX(insetBounds))
-                        deltaX = _CGRectGetMinX(insetBounds) - eventLocation.x;
-                    else if (eventLocation.x > _CGRectGetMaxX(insetBounds))
-                        deltaX = _CGRectGetMaxX(insetBounds) - eventLocation.x;
+                    if (eventLocation.x < CGRectGetMinX(insetBounds))
+                        deltaX = CGRectGetMinX(insetBounds) - eventLocation.x;
+                    else if (eventLocation.x > CGRectGetMaxX(insetBounds))
+                        deltaX = CGRectGetMaxX(insetBounds) - eventLocation.x;
                     if (deltaX < -insetBounds.size.width)
                         deltaX = -insetBounds.size.width;
                     if (deltaX > insetBounds.size.width)
                         deltaX = insetBounds.size.width;
                 }
 
-                var scrollPoint = _CGPointMake(bounds.origin.x - deltaX, bounds.origin.y - deltaY);
+                var scrollPoint = CGPointMake(bounds.origin.x - deltaX, bounds.origin.y - deltaY);
 
                 [contentView scrollToPoint:scrollPoint];
                 [[scrollView _headerView] scrollPoint:scrollPoint];
@@ -370,22 +370,26 @@ var CPDraggingSource_draggedImage_movedTo_          = 1 << 0,
         if (mouseDownWindow)
             mouseDownEventLocation = [mouseDownWindow convertBaseToGlobal:mouseDownEventLocation];
 
-        _draggingOffset = _CGSizeMake(mouseDownEventLocation.x - viewLocation.x, mouseDownEventLocation.y - viewLocation.y);
+        _draggingOffset = CGSizeMake(mouseDownEventLocation.x - viewLocation.x, mouseDownEventLocation.y - viewLocation.y);
     }
     else
-        _draggingOffset = _CGSizeMakeZero();
+        _draggingOffset = CGSizeMakeZero();
 
     if ([CPPlatform isBrowser])
         [_draggedWindow setPlatformWindow:[aWindow platformWindow]];
 
-    [aView setFrameOrigin:_CGPointMakeZero()];
+    [aView setFrameOrigin:CGPointMakeZero()];
 
-    var mouseLocation = [CPEvent mouseLocation];
+    var mouseLocation = [CPEvent mouseLocation],
+        viewSize = [aView frameSize],
+        startDragLocationX = mouseLocation.x - _draggingOffset.width,
+        startDragLocationY = mouseLocation.y - _draggingOffset.height,
+        draggedWindowFrame = CGRectMake(startDragLocationX, startDragLocationY, viewSize.width, viewSize.height);
 
     // Place it where the mouse pointer is.
-    _startDragLocation = _CGPointMake(mouseLocation.x - _draggingOffset.width, mouseLocation.y - _draggingOffset.height);
-    [_draggedWindow setFrameOrigin:_startDragLocation];
-    [_draggedWindow setFrameSize:[aView frame].size];
+    _startDragLocation = CGPointMake(startDragLocationX, startDragLocationY);
+
+    [_draggedWindow _setFrame:draggedWindowFrame display:YES animate:NO constrainWidth:NO constrainHeight:NO];
 
     [[_draggedWindow contentView] addSubview:aView];
 
@@ -434,7 +438,7 @@ var CPDraggingSource_draggedImage_movedTo_          = 1 << 0,
     var imageSize = [anImage size];
 
     if (!_imageView)
-        _imageView = [[CPImageView alloc] initWithFrame:_CGRectMake(0.0, 0.0, imageSize.width, imageSize.height)];
+        _imageView = [[CPImageView alloc] initWithFrame:CGRectMake(0.0, 0.0, imageSize.width, imageSize.height)];
 
     [_imageView setImage:anImage];
 
@@ -461,6 +465,7 @@ var CPDraggingSource_draggedImage_movedTo_          = 1 << 0,
     else if (type === CPKeyDown)
     {
         var characters = [anEvent characters];
+
         if (characters === CPEscapeFunctionKey)
         {
             _dragOperation = CPDragOperationNone;
@@ -477,39 +482,7 @@ var CPDraggingSource_draggedImage_movedTo_          = 1 << 0,
     // If we're not a mouse up, then we're going to want to grab the next event.
     [CPApp setTarget:self selector:@selector(trackDragging:)
         forNextEventMatchingMask:CPMouseMovedMask | CPLeftMouseDraggedMask | CPLeftMouseUpMask | CPKeyDownMask
-        untilDate:nil inMode:0 dequeue:NO];
-}
-
-@end
-
-@implementation CPWindow (CPDraggingAdditions)
-
-/* @ignore */
-- (id)_dragHitTest:(CGPoint)aPoint pasteboard:(CPPasteboard)aPasteboard
-{
-    // If none of our views or ourselves has registered for drag events...
-    if (!_inclusiveRegisteredDraggedTypes)
-        return nil;
-
-// We don't need to do this because the only place this gets called
-// -_dragHitTest: in CPPlatformWindow does this already. Perhaps to
-// be safe?
-//    if (![self containsPoint:aPoint])
-//        return nil;
-
-    var adjustedPoint = [self convertPlatformWindowToBase:aPoint],
-        hitView = [_windowView hitTest:adjustedPoint];
-
-    while (hitView && ![aPasteboard availableTypeFromArray:[hitView registeredDraggedTypes]])
-        hitView = [hitView superview];
-
-    if (hitView)
-        return hitView;
-
-    if ([aPasteboard availableTypeFromArray:[self registeredDraggedTypes]])
-        return self;
-
-    return nil;
+        untilDate:nil inMode:0 dequeue:YES];
 }
 
 @end

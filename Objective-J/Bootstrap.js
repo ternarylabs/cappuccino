@@ -22,7 +22,7 @@
 
 
 #ifdef COMMONJS
-var mainBundleURL = new CFURL("file:" + require("file").cwd());
+var mainBundleURL = new CFURL("file:" + require("file").cwd()).asDirectoryPathURL();
 #elif defined(BROWSER)
 // This is automatic when importing, but we'd like these important URLs to
 // be taken into consideration in the cache as well.
@@ -119,7 +119,7 @@ var documentLoaded = NO;
 
 function afterDocumentLoad(/*Function*/ aFunction)
 {
-    if (documentLoaded)
+    if (documentLoaded || document.readyState === "complete")
         return aFunction();
 
     if (window.addEventListener)

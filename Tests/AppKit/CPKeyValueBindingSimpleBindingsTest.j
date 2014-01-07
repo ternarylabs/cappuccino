@@ -105,7 +105,7 @@
 {
     // Note: this cib will connect 'objectController'. This is only for debugging purposes,
     // this code should run with or without that connection.
-    var cib = [CPBundle loadCibFile:[[CPBundle bundleForClass:CPKeyValueBindingSimpleBindingsTest] pathForResource:"SimpleBindingsAdoption_03.cib"] externalNameTable:[CPDictionary dictionaryWithObject:self forKey:CPCibOwner]];
+    var cib = [CPBundle loadCibFile:[[CPBundle bundleForClass:CPKeyValueBindingSimpleBindingsTest] pathForResource:"SimpleBindingsAdoption_03.cib"] externalNameTable:@{ CPCibOwner: self }];
 
     // Test the interaction.
     [textField setStringValue:@"0.7"];
@@ -124,8 +124,8 @@
     [self verifyVolume:0 method:"bindings"];
 
     // Test if CPNullPlaceholderBindingOption is correctly decoded
-    var bindingInfo = [textField infoForBinding:@"value"];
-    var nullPlaceHolder = [[bindingInfo objectForKey:CPOptionsKey] objectForKey:CPNullPlaceholderBindingOption];
+    var bindingInfo = [textField infoForBinding:@"value"],
+        nullPlaceHolder = [[bindingInfo objectForKey:CPOptionsKey] objectForKey:CPNullPlaceholderBindingOption];
     [self assert:@"Nothing" equals:nullPlaceHolder];
 }
 
@@ -140,7 +140,7 @@
 
 - (void)updateVolumeFrom:(id)sender
 {
-    newVolume = [sender floatValue];
+    var newVolume = [sender floatValue];
     [track setVolume:newVolume];
     [self updateUserInterface];
 }

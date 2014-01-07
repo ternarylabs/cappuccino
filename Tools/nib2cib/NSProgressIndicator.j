@@ -22,6 +22,8 @@
 
 @import <AppKit/CPProgressIndicator.j>
 
+@class Nib2Cib
+
 var NSProgressIndicatorSpinningFlag = 1 << 12;
 
 @implementation CPProgressIndicator (NSCoding)
@@ -34,27 +36,34 @@ var NSProgressIndicatorSpinningFlag = 1 << 12;
     {
         var NS_flags    = [aCoder decodeIntForKey:@"NSpiFlags"];
 
-        _minValue       = [aCoder decodeDoubleForKey:@"NSMinValue"] || 0;
+        _minValue       = [aCoder decodeDoubleForKey:@"NSMinValue"];
         _maxValue       = [aCoder decodeDoubleForKey:@"NSMaxValue"];
 
         _style = (NS_flags & NSProgressIndicatorSpinningFlag) ? CPProgressIndicatorSpinningStyle : CPProgressIndicatorBarStyle;
-        _isIndeterminate = (NS_flags & 2) ? YES : NO;
+        _indeterminate = (NS_flags & 2) ? YES : NO;
         _isDisplayedWhenStopped = (NS_flags & 8192) ? NO : YES;
-        _controlSize = CPRegularControlSize;
+        _controlSize = (NS_flags & 256) ? CPSmallControlSize : CPRegularControlSize;
+
+        if (_style === CPProgressIndicatorSpinningStyle)
+        {
+            // For whatever reason, our 'regular' size is larger than any Cocoa size, our 'small' size is Cocoa's regular and
+            // our 'mini' size is Cocoa's small.
+            _controlSize = _controlSize == CPRegularControlSize ? CPSmallControlSize : CPMiniControlSize;
+        }
 
         // There is a bug in Xcode. the currentValue is not stored.
         // Let's set it to 0.0 for now.
         _doubleValue = 0.0;
 
-        // Readjust the height of the control to the correct size.
         var currentFrameSize = [self frameSize];
-        if (_style == CPProgressIndicatorSpinningStyle)
+
+        if (_style !== CPProgressIndicatorSpinningStyle)
         {
-            currentFrameSize.height = 64.0;
-            currentFrameSize.width = 64.0;
+            var theme = [Nib2Cib defaultTheme],
+                height = [theme valueForAttributeWithName:@"default-height" forClass:CPProgressIndicator];
+
+            currentFrameSize.height = height;
         }
-        else
-            currentFrameSize.height = 15.0;
 
         [self setFrameSize:currentFrameSize];
 

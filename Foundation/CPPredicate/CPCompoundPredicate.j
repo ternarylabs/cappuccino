@@ -22,27 +22,9 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
+@import "CPCompoundPredicate_Constants.j"
 @import "CPArray.j"
-@import "CPPredicate.j"
-
-/*!
-    A predicate to directly compare the left and right hand sides.
-    @global
-    @class CPCompoundPredicate
-*/
-CPNotPredicateType = 0;
-/*!
-    A predicate to directly compare the left and right hand sides.
-    @global
-    @class CPCompoundPredicate
-*/
-CPAndPredicateType = 1;
-/*!
-    A predicate to directly compare the left and right hand sides.
-    @global
-    @class CPCompoundPredicate
-*/
-CPOrPredicateType  = 2;
+@import "_CPPredicate.j"
 
 var CPCompoundPredicateType;
 
@@ -233,7 +215,7 @@ var CPCompoundPredicateType;
     if (self === anObject)
         return YES;
 
-    if (anObject.isa !== self.isa || _type !== [anObject compoundPredicateType] || ![_predicates isEqualToArray:[anObject subpredicates]])
+    if (anObject === nil || anObject.isa !== self.isa || _type !== [anObject compoundPredicateType] || ![_predicates isEqualToArray:[anObject subpredicates]])
         return NO;
 
     return YES;

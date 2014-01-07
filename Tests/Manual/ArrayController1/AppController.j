@@ -21,20 +21,16 @@ CPLogRegister(CPLogConsole);
     @outlet CPTextField         selectedPriceField;
 
     CPArray             itemsArray;
-    CPArrayController   arrayController;
+    @outlet CPArrayController   arrayController;
 }
 
 - (void)awakeFromCib
 {
-    var contentView = [theWindow contentView];
+    var contentView = [theWindow contentView],
+        notWrongItem = [Item new];
 
-    //create our non ui objects
-
-    var notWrongItem = [Item new];
     [notWrongItem setRightOrWrong:"also right"];
     itemsArray = [[Item new], notWrongItem];
-
-    arrayController = [[CPArrayController alloc] init];
 
     [arrayController setEditable:YES];
     [arrayController setObjectClass:Item];
@@ -70,7 +66,7 @@ CPLogRegister(CPLogConsole);
 
     //order front window
 
-    [theWindow setFullBridge:YES];
+    [theWindow setFullPlatformWindow:YES];
     [theWindow orderFront:self];
 }
 /*
@@ -79,63 +75,53 @@ CPLogRegister(CPLogConsole);
     return [itemsArray count];
 }
 
-- (id)tableView:(CPTableView)tableView objectValueForTableColumn:(CPTableColumn)tableColumn row:(int)row
+- (id)tableView:(CPTableView)tableView objectValueForTableColumn:(CPTableColumn)tableColumn row:(CPInteger)row
 {
     return "foo";
 }
 */
 
-- (BOOL)tableView:(CPTableView)aTableView shouldEditTableColumn:(CPTableColumn)aTableColumn row:(int)rowIndex
+- (BOOL)tableView:(CPTableView)aTableView shouldEditTableColumn:(CPTableColumn)aTableColumn row:(CPInteger)rowIndex
 {
     return YES;
-}
-
-- (void)add:(id)aSender
-{
-    [arrayController add:self];
-}
-
-- (void)remove:(id)aSender
-{
-    [arrayController remove:self];
 }
 
 - (void)createBindings
 {
     // bind array controller to self's itemsArray
 
-    [arrayController bind:@"contentArray" toObject:self
-              withKeyPath:@"itemsArray" options:nil];
+    [arrayController bind:@"contentArray" toObject:self withKeyPath:@"itemsArray" options:nil];
 
     // bind the total field -- no options on this one
     [totalCountField bind:CPValueBinding toObject:arrayController
               withKeyPath:@"selectedObjects.@sum.price" options:nil];
 
-    var bindingOptions = [CPDictionary dictionary];
+    var bindingOptions = @{};
     //[bindingOptions setObject:@"No Name" forKey:@"NSNullPlaceholder"];
-    [selectedNameField bind: @"value" toObject:arrayController
-              withKeyPath:@"selection.name" options:bindingOptions];
+    [selectedNameField bind:CPValueBinding toObject:arrayController
+                withKeyPath:@"selection.name" options:bindingOptions];
 
     // binding for "name" column
     var tableColumn = [tableView tableColumnWithIdentifier:@"name"],
-    bindingOptions = [CPDictionary dictionary];
-    [tableColumn bind:@"value" toObject: arrayController
+        bindingOptions = @{};
+
+    [tableColumn bind:CPValueBinding toObject:arrayController
           withKeyPath:@"arrangedObjects.name" options:bindingOptions];
 
 
     // binding options for "price"
     // no need for placeholder as overridden by formatters
-    bindingOptions = [CPDictionary dictionary];
+    bindingOptions = @{};
     //[bindingOptions removeObjectForKey:@"NSNullPlaceholder"];
     //[bindingOptions setObject:YES
     //                 forKey:CPValidatesImmediatelyBindingOption];
-    [selectedPriceField bind:@"value" toObject: arrayController
+    [selectedPriceField bind:CPValueBinding toObject: arrayController
                  withKeyPath:@"selection.price" options:bindingOptions];
 
     // binding for "price" column
     tableColumn = [tableView tableColumnWithIdentifier:@"price"];
-    bindingOptions = [CPDictionary dictionary];
-    [tableColumn bind:@"value" toObject: arrayController
+    bindingOptions = @{};
+    [tableColumn bind:CPValueBinding toObject:arrayController
           withKeyPath:@"arrangedObjects.price" options:bindingOptions];
 
     tableColumn = [tableView tableColumnWithIdentifier:@"all right"];
@@ -148,27 +134,29 @@ CPLogRegister(CPLogConsole);
     return [itemsArray count];
 }
 
-- (id)objectInItemsArrayAtIndex:(unsigned int)index
+- (id)objectInItemsArrayAtIndex:(CPUInteger)index
 {
     return [itemsArray objectAtIndex:index];
 }
 
-- (void)insertObject:(id)anObject inItemsArrayAtIndex:(unsigned int)index
+- (void)insertObject:(id)anObject inItemsArrayAtIndex:(CPUInteger)index
 {
     [itemsArray insertObject:anObject atIndex:index];
 }
 
-- (void)removeObjectFromItemsArrayAtIndex:(unsigned int)index
+- (void)removeObjectFromItemsArrayAtIndex:(CPUInteger)index
 {
     [itemsArray removeObjectAtIndex:index];
 }
 
-- (void)replaceObjectInItemsArrayAtIndex:(unsigned int)index withObject:(id)anObject
+- (void)replaceObjectInItemsArrayAtIndex:(CPUInteger)index withObject:(id)anObject
 {
     [itemsArray replaceObjectAtIndex:index withObject:anObject];
 }
 
 @end
+
+var ItemCounter = 0;
 
 @implementation Item : CPObject
 {
@@ -181,12 +169,12 @@ CPLogRegister(CPLogConsole);
 {
     self = [super init];
     price = 7.0;
-    name = "bob";
+    name = "bob " + (ItemCounter++);
     rightOrWrong = "wrong";
     return self;
 }
 
-- (BOOL)validatePrice:(id)value error:({CPError})error
+- (BOOL)validatePrice:(id)value error:(/*{*/CPError/*}*/)error
 {
     if ([value intValue] >= 0)
         return YES;

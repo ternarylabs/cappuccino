@@ -24,8 +24,10 @@
 
 @import "NSView.j"
 
+@global CP_NSMapClassName
 
-var _CPCibCustomViewClassNameKey    = @"_CPCibCustomViewClassNameKey";
+
+var _CPCibCustomViewClassNameKey = @"_CPCibCustomViewClassNameKey";
 
 @implementation NSCustomView : CPView
 {
@@ -49,7 +51,7 @@ var _CPCibCustomViewClassNameKey    = @"_CPCibCustomViewClassNameKey";
     [aCoder encodeObject:CP_NSMapClassName(_className) forKey:_CPCibCustomViewClassNameKey];
 }
 
-- (CPString)classForKeyedArchiver
+- (Class)classForKeyedArchiver
 {
     return [_CPCibCustomView class];
 }

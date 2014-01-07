@@ -104,7 +104,7 @@ var rootItems = [CPArray arrayWithObject:[CPDictionary dictionaryWithObjectsAndK
     [buttonBar setButtons:[CPArray arrayWithObjects:plusButton, minusButton]];
     [superView addSubview:buttonBar];
 
-    [theWindow setFullBridge:YES];
+    [theWindow setFullPlatformWindow:YES];
 }
 // Get the table data
 - (void)connection:(CPURLConnection)connection didReceiveData:(CPString)dataString
@@ -309,11 +309,13 @@ var rootItems = [CPArray arrayWithObject:[CPDictionary dictionaryWithObjectsAndK
 // Resize the sheet if needed
 - (void)ruleEditorRowsDidChange:(CPNotification)notif
 {
+/*
     var frame = [predicateSheet frame],
         newHeight = [predicateEditor numberOfRows] * [predicateEditor rowHeight] + 103;
 
     frame.size.height = MAX([predicateSheet minSize].height, newHeight);
     [predicateSheet setFrame:frame display:[predicateSheet isSheet] animate:[predicateSheet isSheet]];
+*/
 }
 
 @end

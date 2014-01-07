@@ -35,6 +35,7 @@ var CPUndoManagerNormal     = 0,
 
 CPUndoManagerCheckpointNotification         = @"CPUndoManagerCheckpointNotification";
 CPUndoManagerDidOpenUndoGroupNotification   = @"CPUndoManagerDidOpenUndoGroupNotification";
+CPUndoManagerDidCloseUndoGroupNotification  = @"CPUndoManagerDidCloseUndoGroupNotification";
 CPUndoManagerDidRedoChangeNotification      = @"CPUndoManagerDidRedoChangeNotification";
 CPUndoManagerDidUndoChangeNotification      = @"CPUndoManagerDidUndoChangeNotification";
 CPUndoManagerWillCloseUndoGroupNotification = @"CPUndoManagerWillCloseUndoGroupNotification";
@@ -217,6 +218,7 @@ var _CPUndoGroupingParentKey        = @"_CPUndoGroupingParentKey",
         _redoStack = [];
         _undoStack = [];
 
+        _disableCount = 0;
         _state = CPUndoManagerNormal;
 
         [self setRunLoopModes:[CPDefaultRunLoopMode]];
@@ -490,6 +492,10 @@ if (_currentGroup == nil)
 
         if (_levelsOfUndo > 0 && stack.length > _levelsOfUndo)
             stack.splice(0, 1);
+
+        [defaultCenter
+            postNotificationName:CPUndoManagerDidCloseUndoGroupNotification
+                          object:self];
     }
 
     // Nested Undo Grouping
@@ -853,7 +859,7 @@ var CPUndoManagerRedoStackKey       = @"CPUndoManagerRedoStackKey",
         _undoStack = [aCoder decodeObjectForKey:CPUndoManagerUndoStackKey];
 
         _levelsOfUndo = [aCoder decodeObjectForKey:CPUndoManagerLevelsOfUndoKey];
-        _actionName = [aCoder decodeObjectForKey:CPUndoManagerActionNameKey];
+//        _actionName = [aCoder decodeObjectForKey:CPUndoManagerActionNameKey];
         _currentGrouping = [aCoder decodeObjectForKey:CPUndoManagerCurrentGroupingKey];
 
         _state = CPUndoManagerNormal;
@@ -871,7 +877,7 @@ var CPUndoManagerRedoStackKey       = @"CPUndoManagerRedoStackKey",
     [aCoder encodeObject:_undoStack forKey:CPUndoManagerUndoStackKey];
 
     [aCoder encodeInt:_levelsOfUndo forKey:CPUndoManagerLevelsOfUndoKey];
-    [aCoder encodeObject:_actionName forKey:CPUndoManagerActionNameKey];
+//    [aCoder encodeObject:_actionName forKey:CPUndoManagerActionNameKey];
 
     [aCoder encodeObject:_currentGrouping forKey:CPUndoManagerCurrentGroupingKey];
 

@@ -1,7 +1,9 @@
 
 @import <AppKit/CPWindow.j>
+@import <AppKit/_CPBorderlessWindowView.j>
+@import <Foundation/CPURL.j>
 
-[CPApplication sharedApplication]
+[CPApplication sharedApplication];
 
 @implementation CPWindowTest : OJTestCase
 {
@@ -19,12 +21,11 @@
     [self assertTrue:!![self window]];
 }
 
-- (void)testThatContentViewIsInitialFirstResponder
+- (void)testThatNilIsInitialFirstResponder
 {
-    var contentView = [[self window] contentView];
-    [self assert:contentView
+    [self assert:nil
           equals:[[self window] initialFirstResponder]
-         message:@"The window's content view must be the initial first responder"];
+         message:@"The initial first responder must be null"];
 }
 
 - (void)testKeyViewLoop
@@ -34,11 +35,11 @@
 
     [textField setFrame:CGRectMake(100.0, 100.0, 100.0, 26.0)];
     [contentView addSubview:textField];
-    [[self window] recalculateKeyViewLoop];
 
     var nextTextField = [CPTextField textFieldWithStringValue:@"" placeholder:@"" width:100];
     [nextTextField setFrame:CGRectMake(100.0, 200.0, 100.0, 26.0)];
     [contentView addSubview:nextTextField];
+
     [[self window] recalculateKeyViewLoop];
 
     // Test nextKeyView
@@ -107,6 +108,24 @@
     [self assert:nextTextField
           equals:[contentView previousValidKeyView]
          message:@"nextTextField should be the previous valid key view of contentView"];
+}
+
+- (void)testRepresentedFilename
+{
+    /*
+        representedURL and representedFilename
+        are drawn from the _representedURL variable.
+    */
+    var aURL = @"http://www.cappuccino-project.org";
+
+    [[self window] setRepresentedURL:[CPURL URLWithString:aURL]];
+    [self assertTrue:[[[self window] representedURL] class] === [CPURL class]];
+    /*
+        Test for Issue 1633
+        Make sure that changing it via setRepresentedFilename doesn't change the type
+    */
+    [[self window] setRepresentedFilename:aURL];
+    [self assertTrue:[[[self window] representedURL] class] === [CPURL class]];
 }
 
 @end

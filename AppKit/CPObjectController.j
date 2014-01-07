@@ -22,8 +22,10 @@
 
 @import <Foundation/CPDictionary.j>
 @import <Foundation/CPCountedSet.j>
+@import <Foundation/_CPCollectionKVCOperators.j>
 
 @import "CPController.j"
+@import "CPKeyValueBinding.j"
 
 /*!
     @class
@@ -49,8 +51,11 @@
     CPCountedSet    _observedKeys;
 }
 
-+ (id)initialize
++ (void)initialize
 {
+    if (self !== [CPObjectController class])
+        return;
+
     [self exposeBinding:@"editable"];
     [self exposeBinding:@"contentObject"];
 }
@@ -101,11 +106,13 @@
 {
     if (self = [super init])
     {
-        [self setContent:aContent];
         [self setEditable:YES];
         [self setObjectClass:[CPMutableDictionary class]];
 
         _observedKeys = [[CPCountedSet alloc] init];
+        _selection = [[CPControllerSelectionProxy alloc] initWithController:self];
+
+        [self setContent:aContent];
     }
 
     return self;
@@ -371,7 +378,7 @@ var CPObjectControllerContentKey                        = @"CPObjectControllerCo
 
         [self setObjectClass:objectClass || [CPMutableDictionary class]];
         [self setEditable:[aCoder decodeBoolForKey:CPObjectControllerIsEditableKey]];
-        [self setAutomaticallyPreparesContent:[aCoder decodeBoolForKey:CPObjectControllerAutomaticallyPreparesContentKey] || NO];
+        [self setAutomaticallyPreparesContent:[aCoder decodeBoolForKey:CPObjectControllerAutomaticallyPreparesContentKey]];
         [self setContent:[aCoder decodeObjectForKey:CPObjectControllerContentKey]];
 
         _observedKeys = [[CPCountedSet alloc] init];
@@ -513,8 +520,12 @@ var CPObjectControllerContentKey                        = @"CPObjectControllerCo
 
 - (void)addObserver:(id)anObserver forKeyPath:(CPString)aKeyPath options:(CPKeyValueObservingOptions)options context:(id)context
 {
-    if (aKeyPath.indexOf("@") === 0)
+    if (aKeyPath.charAt(0) === "@")
     {
+        // Simple collection operators are scalar and can't be proxied
+        if ([_CPCollectionKVCOperator isSimpleCollectionOperator:aKeyPath])
+            return;
+
         var proxy = [[_CPObservationProxy alloc] initWithKeyPath:aKeyPath observer:anObserver object:self];
 
         proxy._options = options;
@@ -537,8 +548,12 @@ var CPObjectControllerContentKey                        = @"CPObjectControllerCo
 
 - (void)removeObserver:(id)anObserver forKeyPath:(CPString)aKeyPath
 {
-    if (aKeyPath.indexOf("@") === 0)
+    if (aKeyPath.charAt(0) === "@")
     {
+        // Simple collection operators are scalar and can't be proxied
+        if ([_CPCollectionKVCOperator isSimpleCollectionOperator:aKeyPath])
+            return;
+
         var proxy = [[_CPObservationProxy alloc] initWithKeyPath:aKeyPath observer:anObserver object:self],
             index = [_observationProxies indexOfObject:proxy];
 
@@ -557,13 +572,13 @@ var CPObjectControllerContentKey                        = @"CPObjectControllerCo
     }
 }
 
-- (void)insertObject:(id)anObject atIndex:(unsigned)anIndex
+- (void)insertObject:(id)anObject atIndex:(CPUInteger)anIndex
 {
     for (var i = 0, count = [_observationProxies count]; i < count; i++)
     {
         var proxy = [_observationProxies objectAtIndex:i],
             keyPath = [proxy keyPath],
-            operator = keyPath.indexOf(".") === 0;
+            operator = keyPath.charAt(0) === ".";
 
         if (operator)
             [self willChangeValueForKey:keyPath];
@@ -577,18 +592,20 @@ var CPObjectControllerContentKey                        = @"CPObjectControllerCo
     [super insertObject:anObject atIndex:anIndex];
 }
 
-- (void)removeObjectAtIndex:(unsigned)anIndex
+- (void)removeObjectAtIndex:(CPUInteger)anIndex
 {
+    var currentObject = [self objectAtIndex:anIndex];
+
     for (var i = 0, count = [_observationProxies count]; i < count; i++)
     {
         var proxy = [_observationProxies objectAtIndex:i],
             keyPath = [proxy keyPath],
-            operator = keyPath.indexOf(".") === 0;
+            operator = keyPath.charAt(0) === ".";
 
         if (operator)
             [self willChangeValueForKey:keyPath];
 
-        [anObject removeObserver:proxy forKeyPath:keyPath];
+        [currentObject removeObserver:proxy forKeyPath:keyPath];
 
         if (operator)
             [self didChangeValueForKey:keyPath];
@@ -597,7 +614,7 @@ var CPObjectControllerContentKey                        = @"CPObjectControllerCo
     [super removeObjectAtIndex:anIndex];
 }
 
-- (_CPObservableArray)objectsAtIndexes:(CPIndexSet)theIndexes
+- (CPArray)objectsAtIndexes:(CPIndexSet)theIndexes
 {
     return [_CPObservableArray arrayWithArray:[super objectsAtIndexes:theIndexes]];
 }
@@ -612,7 +629,7 @@ var CPObjectControllerContentKey                        = @"CPObjectControllerCo
    [self removeObjectAtIndex:[self count]];
 }
 
-- (void)replaceObjectAtIndex:(unsigned)anIndex withObject:(id)anObject
+- (void)replaceObjectAtIndex:(CPUInteger)anIndex withObject:(id)anObject
 {
     var currentObject = [self objectAtIndex:anIndex];
 
@@ -620,7 +637,7 @@ var CPObjectControllerContentKey                        = @"CPObjectControllerCo
     {
         var proxy = [_observationProxies objectAtIndex:i],
             keyPath = [proxy keyPath],
-            operator = keyPath.indexOf(".") === 0;
+            operator = keyPath.charAt(0) === ".";
 
         if (operator)
             [self willChangeValueForKey:keyPath];
@@ -652,7 +669,7 @@ var CPObjectControllerContentKey                        = @"CPObjectControllerCo
 {
     if (self = [super init])
     {
-        _cachedValues = [CPDictionary dictionary];
+        _cachedValues = @{};
         _observationProxies = [CPArray array];
         _controller = aController;
         _observedObjectsByKeyPath = {};
@@ -694,12 +711,18 @@ var CPObjectControllerContentKey                        = @"CPObjectControllerCo
 
 - (id)valueForKeyPath:(CPString)theKeyPath
 {
-    var values = [[_controller selectedObjects] valueForKeyPath:theKeyPath],
-        value = [self _controllerMarkerForValues:values];
+    var values = [[_controller selectedObjects] valueForKeyPath:theKeyPath];
 
-    [_cachedValues setObject:value forKey:theKeyPath];
+    // Simple collection operators like @count return a scalar value, not an array or set
+    if ([values isKindOfClass:CPArray] || [values isKindOfClass:CPSet])
+    {
+        var value = [self _controllerMarkerForValues:values];
+        [_cachedValues setObject:value forKey:theKeyPath];
 
-    return value;
+        return value;
+    }
+    else
+        return values;
 }
 
 - (id)valueForKey:(CPString)theKeyPath
@@ -777,8 +800,7 @@ var CPObjectControllerContentKey                        = @"CPObjectControllerCo
     [proxy setNotifyObject:YES];
     [_observationProxies addObject:proxy];
 
-    // We keep are reference to the observed objects
-    // because the removeObserver: will be called after the selection changes
+    // We keep a reference to the observed objects because removeObserver: will be called after the selection changes.
     var observedObjects = [_controller selectedObjects];
     _observedObjectsByKeyPath[aKeyPath] = observedObjects;
     [observedObjects addObserver:proxy forKeyPath:aKeyPath options:options context:context];
@@ -794,7 +816,7 @@ var CPObjectControllerContentKey                        = @"CPObjectControllerCo
 
     [_observationProxies removeObjectAtIndex:index];
 
-    _observedObjects = nil;
+    _observedObjectsByKeyPath[aKeyPath] = nil;
 }
 
 @end

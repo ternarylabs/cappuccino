@@ -52,7 +52,7 @@
         [theWindow orderOut:self];
         [theWindow setPlatformWindow:platformWindow];
         [theWindow orderFront:self];
-        [theWindow setFullBridge:YES];
+        [theWindow setFullPlatformWindow:YES];
         var button = [[theWindow contentView] subviews][2];
 
         [button setTarget:self];
@@ -86,7 +86,7 @@
 
 - (IBAction)randomTitle:(id)aSender
 {
-    [theWindow setTitle:@"Window random number " + Math.random(1000)];
+    [theWindow setTitle:@"Window random number " + RAND(1000)];
 }
 
 @end

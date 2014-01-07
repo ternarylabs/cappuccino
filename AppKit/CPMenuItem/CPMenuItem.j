@@ -25,29 +25,33 @@
 @import <Foundation/CPString.j>
 
 @import "CPImage.j"
-@import "CPMenu.j"
+@import "CPText.j"
 @import "CPView.j"
 @import "_CPMenuItemView.j"
 
+@class CPMenu
 
-var CPMenuItemStringRepresentationDictionary = [CPDictionary dictionary];
-[CPMenuItemStringRepresentationDictionary setObject:"\u238B" forKey:CPEscapeFunctionKey];
-[CPMenuItemStringRepresentationDictionary setObject:"\u21E5" forKey:CPTabCharacter];
-[CPMenuItemStringRepresentationDictionary setObject:"\u21E4" forKey:CPBackTabCharacter];
-[CPMenuItemStringRepresentationDictionary setObject:"\u2423" forKey:CPSpaceFunctionKey];
-[CPMenuItemStringRepresentationDictionary setObject:"\u23CE" forKey:CPCarriageReturnCharacter];
-[CPMenuItemStringRepresentationDictionary setObject:"\u232B" forKey:CPBackspaceCharacter];
-[CPMenuItemStringRepresentationDictionary setObject:"\u232B" forKey:CPDeleteFunctionKey];
-[CPMenuItemStringRepresentationDictionary setObject:"\u2326" forKey:CPDeleteCharacter];
-[CPMenuItemStringRepresentationDictionary setObject:"\u21F1" forKey:CPHomeFunctionKey];
-[CPMenuItemStringRepresentationDictionary setObject:"\u21F2" forKey:CPEndFunctionKey];
-[CPMenuItemStringRepresentationDictionary setObject:"\u21DE" forKey:CPPageUpFunctionKey];
-[CPMenuItemStringRepresentationDictionary setObject:"\u21DF" forKey:CPPageDownFunctionKey];
-[CPMenuItemStringRepresentationDictionary setObject:"\u2191" forKey:CPUpArrowFunctionKey];
-[CPMenuItemStringRepresentationDictionary setObject:"\u2193" forKey:CPDownArrowFunctionKey];
-[CPMenuItemStringRepresentationDictionary setObject:"\u2190" forKey:CPLeftArrowFunctionKey];
-[CPMenuItemStringRepresentationDictionary setObject:"\u2192" forKey:CPRightArrowFunctionKey];
-[CPMenuItemStringRepresentationDictionary setObject:"\u2327" forKey:CPClearDisplayFunctionKey];
+@global CPApp
+
+var CPMenuItemStringRepresentationDictionary = @{
+        CPEscapeFunctionKey:        "\u238B",
+        CPTabCharacter:             "\u21E5",
+        CPBackTabCharacter:         "\u21E4",
+        CPSpaceFunctionKey:         "\u2423",
+        CPCarriageReturnCharacter:  "\u23CE",
+        CPBackspaceCharacter:       "\u232B",
+        CPDeleteFunctionKey:        "\u232B",
+        CPDeleteCharacter:          "\u2326",
+        CPHomeFunctionKey:          "\u21F1",
+        CPEndFunctionKey:           "\u21F2",
+        CPPageUpFunctionKey:        "\u21DE",
+        CPPageDownFunctionKey:      "\u21DF",
+        CPUpArrowFunctionKey:       "\u2191",
+        CPDownArrowFunctionKey:     "\u2193",
+        CPLeftArrowFunctionKey:     "\u2190",
+        CPRightArrowFunctionKey:    "\u2192",
+        CPClearDisplayFunctionKey:  "\u2327",
+    };
 
 /*!
     @ingroup appkit
@@ -101,6 +105,16 @@ var CPMenuItemStringRepresentationDictionary = [CPDictionary dictionary];
     _CPMenuItemView _menuItemView;
 }
 
++ (Class)_binderClassForBinding:(CPString)aBinding
+{
+    if ([aBinding hasPrefix:CPEnabledBinding])
+        return [CPMultipleValueAndBinding class];
+    else if (aBinding === CPTargetBinding || [aBinding hasPrefix:CPArgumentBinding])
+        return [CPActionBinding class];
+
+    return [super _binderClassForBinding:aBinding];
+}
+
 - (id)init
 {
     return [self initWithTitle:@"" action:nil keyEquivalent:nil];
@@ -151,6 +165,9 @@ var CPMenuItemStringRepresentationDictionary = [CPDictionary dictionary];
 {
     if (_isEnabled === isEnabled)
         return;
+
+    if (!isEnabled && [self isHighlighted])
+        [_menu _highlightItemAtIndex:CPNotFound];
 
     _isEnabled = !!isEnabled;
 
@@ -281,7 +298,7 @@ var CPMenuItemStringRepresentationDictionary = [CPDictionary dictionary];
 */
 - (void)setFont:(CPFont)aFont
 {
-    if (_font == aFont)
+    if ([_font isEqual:aFont])
         return;
 
     _font = aFont;
@@ -932,34 +949,33 @@ var CPMenuItemIsSeparatorKey                = @"CPMenuItemIsSeparatorKey",
         _action = [aCoder decodeObjectForKey:CPMenuItemActionKey];
 
         _isEnabled = DEFAULT_VALUE(CPMenuItemIsEnabledKey, YES);
-        _isHidden = DEFAULT_VALUE(CPMenuItemIsHiddenKey, NO);
-        _tag = DEFAULT_VALUE(CPMenuItemTagKey, 0);
-        _state = DEFAULT_VALUE(CPMenuItemStateKey, CPOffState);
+        _isHidden = [aCoder decodeBoolForKey:CPMenuItemIsHiddenKey];
+        _tag = [aCoder decodeIntForKey:CPMenuItemTagKey];
+        _state = [aCoder decodeIntForKey:CPMenuItemStateKey];
 
-        _image = DEFAULT_VALUE(CPMenuItemImageKey, nil);
-        _alternateImage = DEFAULT_VALUE(CPMenuItemAlternateImageKey, nil);
+        _image = [aCoder decodeObjectForKey:CPMenuItemImageKey];
+        _alternateImage = [aCoder decodeObjectForKey:CPMenuItemAlternateImageKey];
 //    CPImage         _onStateImage;
 //    CPImage         _offStateImage;
 //    CPImage         _mixedStateImage;
 
         // This order matters because setSubmenu: needs _menu to be around.
-        _menu = DEFAULT_VALUE(CPMenuItemMenuKey, nil);
-        [self setSubmenu:DEFAULT_VALUE(CPMenuItemSubmenuKey, nil)];
+        _menu = [aCoder decodeObjectForKey:CPMenuItemMenuKey];
+        [self setSubmenu:[aCoder decodeObjectForKey:CPMenuItemSubmenuKey]];
 
         _keyEquivalent = [aCoder decodeObjectForKey:CPMenuItemKeyEquivalentKey] || @"";
-        _keyEquivalentModifierMask = [aCoder decodeObjectForKey:CPMenuItemKeyEquivalentModifierMaskKey] || 0;
+        _keyEquivalentModifierMask = [aCoder decodeIntForKey:CPMenuItemKeyEquivalentModifierMaskKey];
 
 //    int             _mnemonicLocation;
 
 //    BOOL            _isAlternate;
 
-        // Default is 0.
-        [self setIndentationLevel:[aCoder decodeIntForKey:CPMenuItemIndentationLevelKey] || 0];
+        [self setIndentationLevel:[aCoder decodeIntForKey:CPMenuItemIndentationLevelKey]];
 
 //    CPString        _toolTip;
 
-        _representedObject = DEFAULT_VALUE(CPMenuItemRepresentedObjectKey, nil);
-        _view = DEFAULT_VALUE(CPMenuItemViewKey, nil);
+        _representedObject = [aCoder decodeObjectForKey:CPMenuItemRepresentedObjectKey];
+        _view = [aCoder decodeObjectForKey:CPMenuItemViewKey];
     }
 
     return self;

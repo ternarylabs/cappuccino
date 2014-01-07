@@ -2,7 +2,7 @@
  * AppController.j
  * DragAndDrop
  *
- * Created by You on December 10, 2010.
+ * Created by Mike Fellows on December 10, 2010.
  * Copyright 2010, Your Company All rights reserved.
  */
 
@@ -10,7 +10,7 @@
 @import <Foundation/CPIndexSet.j>
 @import <Foundation/CPRange.j>
 
-TableTestDragAndDropTableViewDataType = "@TableTestDragAndDropTableViewDataType";
+TableTestDragAndDropTableViewDataType = @"TableTestDragAndDropTableViewDataType";
 
 @implementation AppController : CPObject
 {
@@ -25,10 +25,10 @@ TableTestDragAndDropTableViewDataType = "@TableTestDragAndDropTableViewDataType"
         count = 100;
 
     rowList = [];
-    while(count--)
+    while (count--)
         rowList[count] = count;
 
-    [scroll setAutoresizingMask:CPViewWidthSizable|CPViewHeightSizable];
+    [scroll setAutoresizingMask:CPViewWidthSizable | CPViewHeightSizable];
 
     var table = [[CPTableView alloc] initWithFrame:CGRectMakeZero()];
     [table setDataSource:self];
@@ -99,9 +99,9 @@ TableTestDragAndDropTableViewDataType = "@TableTestDragAndDropTableViewDataType"
     return [rowList count];
 }
 
-- (id)tableView:(id)tableView objectValueForTableColumn:(CPTableColumn)aColumn row:(int)aRow
+- (id)tableView:(id)tableView objectValueForTableColumn:(CPTableColumn)aColumn row:(CPInteger)aRow
 {
-    if([aColumn identifier] == "Row")
+    if ([aColumn identifier] == "Row")
         return aRow;
     else
         return "Col " + [aColumn identifier] + ", Started as Row " + rowList[aRow];
@@ -118,13 +118,13 @@ TableTestDragAndDropTableViewDataType = "@TableTestDragAndDropTableViewDataType"
     return YES;
 }
 
-- (CPDragOperation)tableView:(CPTableView)aTableView validateDrop:(id)info proposedRow:(int)row proposedDropOperation:(CPTableViewDropOperation)operation
+- (CPDragOperation)tableView:(CPTableView)aTableView validateDrop:(id)info proposedRow:(CPInteger)row proposedDropOperation:(CPTableViewDropOperation)operation
 {
     [aTableView setDropRow:row dropOperation:CPTableViewDropAbove];
     return CPDragOperationMove;
 }
 
-- (BOOL)tableView:(CPTableView)aTableView acceptDrop:(id)info row:(int)row dropOperation:(CPTableViewDropOperation)operation
+- (BOOL)tableView:(CPTableView)aTableView acceptDrop:(id)info row:(CPInteger)row dropOperation:(CPTableViewDropOperation)operation
 {
     var pasteboard = [info draggingPasteboard],
         encodedData = [pasteboard dataForType:TableTestDragAndDropTableViewDataType],
@@ -133,7 +133,7 @@ TableTestDragAndDropTableViewDataType = "@TableTestDragAndDropTableViewDataType"
         destinationRange,
         destinationIndexes;
 
-    if(operation == CPTableViewDropAbove)
+    if (operation == CPTableViewDropAbove)
     {
         // Save the first object in the list so we can determine where the
         // beginning of the moved block begins once all the selected rows have

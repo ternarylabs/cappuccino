@@ -22,6 +22,9 @@
 
 @import <AppKit/CPSlider.j>
 
+@import "NSCell.j"
+
+
 @implementation CPSlider (CPCoding)
 
 - (id)NS_initWithCoder:(CPCoder)aCoder
@@ -32,23 +35,15 @@
     _minValue = [cell minValue];
     _maxValue = [cell maxValue];
 
-    self = [super NS_initWithCoder:aCoder];
+    return [super NS_initWithCoder:aCoder];
+}
 
-    if (self)
-    {
-        _altIncrementValue  = [cell altIncrementValue];
+- (void)NS_initWithCell:(NSCell)cell
+{
+    [super NS_initWithCell:cell];
 
-        [self setSliderType:[cell sliderType]];
-
-        if ([self sliderType] === CPCircularSlider)
-        {
-            var frame = [self frame];
-
-            [self setFrameSize:CGSizeMake(frame.size.width + 4.0, frame.size.height + 2.0)];
-        }
-    }
-
-    return self;
+    _altIncrementValue  = [cell altIncrementValue];
+    [self setSliderType:[cell sliderType]];
 }
 
 @end
@@ -59,7 +54,22 @@
 
 - (id)initWithCoder:(CPCoder)aCoder
 {
-    return [self NS_initWithCoder:aCoder];
+    self = [self NS_initWithCoder:aCoder];
+
+    if (self)
+    {
+        var cell = [aCoder decodeObjectForKey:@"NSCell"];
+        [self NS_initWithCell:cell];
+
+        var frame = [self frame];
+
+        if ([self sliderType] === CPCircularSlider)
+            [self setFrameSize:CGSizeMake(frame.size.width + 2.0, frame.size.height + 2.0)];
+        else
+            [self setFrame:CGRectMake(frame.origin.x + 2, frame.origin.y, frame.size.width - 4, frame.size.height)];
+    }
+
+    return self;
 }
 
 - (Class)classForKeyedArchiver
@@ -84,14 +94,14 @@
 
     if (self)
     {
-        _objectValue        = [aCoder decodeDoubleForKey:@"NSValue"];
+        self._objectValue        = [aCoder decodeDoubleForKey:@"NSValue"];
 
-        _minValue           = [aCoder decodeDoubleForKey:@"NSMinValue"];
-        _maxValue           = [aCoder decodeDoubleForKey:@"NSMaxValue"];
-        _altIncrementValue  = [aCoder decodeDoubleForKey:@"NSAltIncValue"];
-        _isVertical         = [aCoder decodeBoolForKey:@"NSVertical"];
+        self._minValue           = [aCoder decodeDoubleForKey:@"NSMinValue"];
+        self._maxValue           = [aCoder decodeDoubleForKey:@"NSMaxValue"];
+        self._altIncrementValue  = [aCoder decodeDoubleForKey:@"NSAltIncValue"];
+        self._isVertical         = [aCoder decodeBoolForKey:@"NSVertical"];
 
-        _sliderType         = [aCoder decodeIntForKey:@"NSSliderType"] || 0;
+        self._sliderType         = [aCoder decodeIntForKey:@"NSSliderType"];
     }
 
     return self;

@@ -26,8 +26,11 @@
 @import <Foundation/CPSortDescriptor.j>
 @import <Foundation/CPString.j>
 
-@import "CPTableHeaderView.j"
+@import "CPTextField.j"
 
+@global CPTableViewColumnDidResizeNotification
+
+@class _CPTableColumnHeaderView
 
 CPTableColumnNoResizing         = 0;
 CPTableColumnAutoresizingMask   = 1 << 0;
@@ -49,7 +52,7 @@ CPTableColumnUserResizingMask   = 1 << 1;
     CPTableView         _tableView;
     CPView              _headerView;
     CPView              _dataView;
-    Object              _dataViewData;
+    CPData              _dataViewData;
 
     float               _width;
     float               _minWidth;
@@ -83,7 +86,7 @@ CPTableColumnUserResizingMask   = 1 << 1;
 
     if (self)
     {
-        _dataViewData = { };
+        _dataViewData = nil;
 
         _width = 100.0;
         _minWidth = 10.0;
@@ -280,7 +283,7 @@ CPTableColumnUserResizingMask   = 1 << 1;
 */
 - (void)sizeToFit
 {
-    var width = _CGRectGetWidth([_headerView frame]);
+    var width = CGRectGetWidth([_headerView frame]);
 
     if (width < [self minWidth])
         [self setMinWidth:width];
@@ -392,12 +395,12 @@ CPTableColumnUserResizingMask   = 1 << 1;
 - (void)setDataView:(CPView)aView
 {
     if (_dataView)
-        _dataViewData[[_dataView UID]] = nil;
+        _dataViewData = nil;
 
     [aView setThemeState:CPThemeStateTableDataView];
 
     _dataView = aView;
-    _dataViewData[[aView UID]] = [CPKeyedArchiver archivedDataWithRootObject:aView];
+    _dataViewData = [CPKeyedArchiver archivedDataWithRootObject:aView];
 }
 
 - (CPView)dataView
@@ -413,7 +416,7 @@ CPTableColumnUserResizingMask   = 1 << 1;
     to be invoked with row equal to -1 in cases where no actual row is involved but the table
     view needs to get some generic cell info.
 */
-- (id)dataViewForRow:(int)aRowIndex
+- (id)dataViewForRow:(CPInteger)aRowIndex
 {
     return [self dataView];
 }
@@ -421,24 +424,12 @@ CPTableColumnUserResizingMask   = 1 << 1;
 /*!
     @ignore
 */
-- (id)_newDataViewForRow:(int)aRowIndex
+- (id)_newDataView
 {
-    var dataView = [self dataViewForRow:aRowIndex],
-        dataViewUID = [dataView UID];
+    if (!_dataViewData)
+        return nil;
 
-    var x = [self tableView]._cachedDataViews[dataViewUID];
-    if (x && x.length)
-        return x.pop();
-
-    // if we haven't cached an archive of the data view, do it now
-    if (!_dataViewData[dataViewUID])
-        _dataViewData[dataViewUID] = [CPKeyedArchiver archivedDataWithRootObject:dataView];
-
-    // unarchive the data view cache
-    var newDataView = [CPKeyedUnarchiver unarchiveObjectWithData:_dataViewData[dataViewUID]];
-    newDataView.identifier = dataViewUID;
-
-    // make sure only we have control over the size and placement
+    var newDataView = [CPKeyedUnarchiver unarchiveObjectWithData:_dataViewData];
     [newDataView setAutoresizingMask:CPViewNotSizable];
 
     return newDataView;
@@ -494,16 +485,23 @@ CPTableColumnUserResizingMask   = 1 << 1;
 */
 - (CPSortDescriptor)sortDescriptorPrototype
 {
-    return _sortDescriptorPrototype;
+    if (_sortDescriptorPrototype)
+        return _sortDescriptorPrototype;
+
+    var binderClass = [[self class] _binderClassForBinding:CPValueBinding],
+        binding = [binderClass getBinding:CPValueBinding forObject:self];
+
+    return [binding _defaultSortDescriptorPrototype];
 }
 
 /*!
-    If NO the tablecolumn will no longer be visible in the tableview
-    If YES the tablecolumn will be visible in the tableview.
+    If YES the tablecolumn will no longer be visible in the tableview.
+    If NO the tablecolumn will be visible in the tableview.
 */
 - (void)setHidden:(BOOL)shouldBeHidden
 {
     shouldBeHidden = !!shouldBeHidden
+
     if (_isHidden === shouldBeHidden)
         return;
 
@@ -550,7 +548,7 @@ CPTableColumnUserResizingMask   = 1 << 1;
     [[CPNotificationCenter defaultCenter]
     postNotificationName:CPTableViewColumnDidResizeNotification
                   object:[self tableView]
-                userInfo:[CPDictionary dictionaryWithObjects:[self, oldWidth] forKeys:[@"CPTableColumn", "CPOldWidth"]]];
+                userInfo:@{ @"CPTableColumn": self, @"CPOldWidth": oldWidth }];
 }
 
 @end
@@ -569,11 +567,35 @@ CPTableColumnUserResizingMask   = 1 << 1;
     [tableView reloadDataForRowIndexes:rowIndexes columnIndexes:columnIndexes];
 }
 
+- (CPSortDescriptor)_defaultSortDescriptorPrototype
+{
+    if (![self createsSortDescriptor])
+        return nil;
+
+    var keyPath = [_info objectForKey:CPObservedKeyPathKey],
+        dotIndex = keyPath.indexOf(".");
+
+    if (dotIndex === CPNotFound)
+        return nil;
+
+    var firstPart = keyPath.substring(0, dotIndex),
+        key = keyPath.substring(dotIndex + 1);
+
+    return [CPSortDescriptor sortDescriptorWithKey:key ascending:YES];
+}
+
+- (BOOL)createsSortDescriptor
+{
+    var options = [_info objectForKey:CPOptionsKey],
+        optionValue = [options objectForKey:CPCreatesSortDescriptorBindingOption];
+    return optionValue === nil ? YES : [optionValue boolValue];
+}
+
 @end
 
 @implementation CPTableColumn (Bindings)
 
-+ (id)_binderClassForBinding:(CPString)aBinding
++ (Class)_binderClassForBinding:(CPString)aBinding
 {
     if (aBinding == CPValueBinding)
         return [CPTableColumnValueBinder class];
@@ -723,7 +745,7 @@ var CPTableColumnIdentifierKey   = @"CPTableColumnIdentifierKey",
 
     if (self)
     {
-        _dataViewData = { };
+        _dataViewData = nil;
 
         _width = [aCoder decodeFloatForKey:CPTableColumnWidthKey];
         _minWidth = [aCoder decodeFloatForKey:CPTableColumnMinWidthKey];
@@ -806,7 +828,7 @@ var CPTableColumnIdentifierKey   = @"CPTableColumnIdentifierKey",
 /*!
     @ignore
 */
-- (id)dataCellForRow:(int)row
+- (id)dataCellForRow:(CPInteger)row
 {
     [CPException raise:CPUnsupportedMethodException
                 reason:@"dataCellForRow: is not supported. Use -dataViewForRow:row instead."];

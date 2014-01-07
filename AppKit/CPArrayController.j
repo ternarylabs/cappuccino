@@ -65,51 +65,51 @@
 
 + (CPSet)keyPathsForValuesAffectingContentArray
 {
-    return [CPSet setWithObjects:"content"];
+    return [CPSet setWithObjects:@"content"];
 }
 
 + (CPSet)keyPathsForValuesAffectingArrangedObjects
 {
     // Also depends on "filterPredicate" but we'll handle that manually.
-    return [CPSet setWithObjects:"content", "sortDescriptors"];
+    return [CPSet setWithObjects:@"content", @"sortDescriptors"];
 }
 
 + (CPSet)keyPathsForValuesAffectingSelection
 {
-    return [CPSet setWithObjects:"selectionIndexes"];
+    return [CPSet setWithObjects:@"selectionIndexes"];
 }
 
 + (CPSet)keyPathsForValuesAffectingSelectionIndex
 {
-    return [CPSet setWithObjects:"selectionIndexes"];
+    return [CPSet setWithObjects:@"selectionIndexes"];
 }
 
 + (CPSet)keyPathsForValuesAffectingSelectionIndexes
 {
     // When the arranged objects change, selection preservation may cause the indexes
     // to change.
-    return [CPSet setWithObjects:"arrangedObjects"];
+    return [CPSet setWithObjects:@"arrangedObjects"];
 }
 
 + (CPSet)keyPathsForValuesAffectingSelectedObjects
 {
     // Don't need to depend on arrangedObjects here because selectionIndexes already does.
-    return [CPSet setWithObjects:"selectionIndexes"];
+    return [CPSet setWithObjects:@"selectionIndexes"];
 }
 
 + (CPSet)keyPathsForValuesAffectingCanRemove
 {
-    return [CPSet setWithObjects:"selectionIndexes"];
+    return [CPSet setWithObjects:@"selectionIndexes"];
 }
 
 + (CPSet)keyPathsForValuesAffectingCanSelectNext
 {
-    return [CPSet setWithObjects:"selectionIndexes"];
+    return [CPSet setWithObjects:@"selectionIndexes"];
 }
 
 + (CPSet)keyPathsForValuesAffectingCanSelectPrevious
 {
-    return [CPSet setWithObjects:"selectionIndexes"];
+    return [CPSet setWithObjects:@"selectionIndexes"];
 }
 
 
@@ -584,7 +584,7 @@
 */
 - (BOOL)__setSelectionIndexes:(CPIndexSet)indexes
 {
-    [self __setSelectionIndexes:indexes avoidEmpty:_avoidsEmptySelection];
+    return [self __setSelectionIndexes:indexes avoidEmpty:_avoidsEmptySelection];
 }
 
 - (BOOL)__setSelectionIndexes:(CPIndexSet)indexes avoidEmpty:(BOOL)avoidEmpty
@@ -744,6 +744,7 @@
         return;
 
     var willClearPredicate = NO;
+
     if (_clearsFilterPredicateOnInsertion && _filterPredicate)
     {
         [self willChangeValueForKey:@"filterPredicate"];
@@ -792,10 +793,18 @@
     // not appear in arrangedObjects and we do not have to update at all.
     */
 
-    // This will also send notificaitons for arrangedObjects.
+    // TODO: Remove these lines when granular notifications are implemented
+    var proxy = [_CPKVOProxy proxyForObject:self];
+    [proxy setAdding:YES];
+
+    // This will also send notifications for arrangedObjects.
     [self didChangeValueForKey:@"content"];
+
     if (willClearPredicate)
         [self didChangeValueForKey:@"filterPredicate"];
+
+    // TODO: Remove this line when granular notifications are implemented
+    [proxy setAdding:NO];
 }
 
 /*!
@@ -811,6 +820,7 @@
         return;
 
     var willClearPredicate = NO;
+
     if (_clearsFilterPredicateOnInsertion && _filterPredicate)
     {
         [self willChangeValueForKey:@"filterPredicate"];
@@ -848,9 +858,15 @@
     if ([self avoidsEmptySelection] && [[self selectionIndexes] count] <= 0 && [_contentObject count] > 0)
         [self __setSelectionIndexes:[CPIndexSet indexSetWithIndex:0]];
 
+    var proxy = [_CPKVOProxy proxyForObject:self];
+    [proxy setAdding:YES];
+
     [self didChangeValueForKey:@"content"];
+
     if (willClearPredicate)
         [self didChangeValueForKey:@"filterPredicate"];
+
+    [proxy setAdding:NO];
 }
 
 /*!
@@ -879,6 +895,9 @@
 
         [_arrangedObjects removeObjectAtIndex:pos];
         [_selectionIndexes shiftIndexesStartingAtIndex:pos by:-1];
+
+        // This will automatically handle the avoidsEmptySelection case.
+        [self __setSelectionIndexes:_selectionIndexes];
     }
 
     [self didChangeValueForKey:@"content"];
@@ -894,7 +913,9 @@
     if (![self canAdd])
         return;
 
-    [self insert:sender];
+    var newObject = [self automaticallyPreparesContent] ? [self newObject] : [self _defaultNewObject];
+
+    [self addObject:newObject];
 }
 
 /*!
@@ -906,9 +927,13 @@
     if (![self canInsert])
         return;
 
-    var newObject = [self automaticallyPreparesContent] ? [self newObject] : [self _defaultNewObject];
+    var newObject = [self automaticallyPreparesContent] ? [self newObject] : [self _defaultNewObject],
+        lastSelectedIndex = [_selectionIndexes lastIndex];
 
-    [self addObject:newObject];
+    if (lastSelectedIndex !== CPNotFound)
+        [self insertObject:newObject atArrangedObjectIndex:lastSelectedIndex];
+    else
+        [self addObject:newObject];
 }
 
 /*!
@@ -918,6 +943,15 @@
 - (void)remove:(id)sender
 {
     [self removeObjectsAtArrangedObjectIndexes:_selectionIndexes];
+}
+
+/*!
+    Removes the object at the specified index in the controller's arranged objects from the content array.
+    @param int index - index of the object to remove.
+*/
+- (void)removeObjectAtArrangedObjectIndex:(int)index
+{
+    [self removeObjectsAtArrangedObjectIndexes:[CPIndexSet indexSetWithIndex:index]];
 }
 
 /*!
@@ -934,36 +968,38 @@
     _disableSetContent = YES;
 
     var arrangedObjects = [self arrangedObjects],
-        index = [anIndexSet lastIndex],
         position = CPNotFound,
         newSelectionIndexes = [_selectionIndexes copy];
 
-    while (index !== CPNotFound)
-    {
-        var object = [arrangedObjects objectAtIndex:index];
-
-        // First try the simple case which should work if there are no sort descriptors.
-        if ([_contentObject objectAtIndex:index] === object)
-            [_contentObject removeObjectAtIndex:index];
-        else
+    [anIndexSet enumerateIndexesWithOptions:CPEnumerationReverse
+                                 usingBlock:function(anIndex)
         {
-            // Since we don't have a reverse mapping between the sorted order and the
-            // unsorted one, we'll just simply have to remove an arbitrary pointer. It might
-            // be the 'wrong' one - as in not the one the user selected - but the wrong
-            // one is still just another pointer to the same object, so the user will not
-            // be able to see any difference.
-            contentIndex = [_contentObject indexOfObjectIdenticalTo:object];
-            [_contentObject removeObjectAtIndex:contentIndex];
-        }
-        [arrangedObjects removeObjectAtIndex:index];
+            var object = [arrangedObjects objectAtIndex:anIndex];
 
-        // Deselect this row if it was selected, and either way shift all selection indexes
-        // following it up by 1.
-        [newSelectionIndexes removeIndex:index];
-        [newSelectionIndexes shiftIndexesStartingAtIndex:index by:-1];
+            // First try the simple case which should work if there are no sort descriptors.
+            if ([_contentObject objectAtIndex:anIndex] === object)
+                [_contentObject removeObjectAtIndex:anIndex];
+            else
+            {
+                // Since we don't have a reverse mapping between the sorted order and the
+                // unsorted one, we'll just simply have to remove an arbitrary pointer. It might
+                // be the 'wrong' one - as in not the one the user selected - but the wrong
+                // one is still just another pointer to the same object, so the user will not
+                // be able to see any difference.
+                var contentIndex = [_contentObject indexOfObjectIdenticalTo:object];
+                [_contentObject removeObjectAtIndex:contentIndex];
+            }
+            [arrangedObjects removeObjectAtIndex:anIndex];
 
-        index = [anIndexSet indexLessThanIndex:index];
-    }
+            if (!_avoidsEmptySelection || [newSelectionIndexes count] > 1)
+            {
+                [newSelectionIndexes removeIndex:anIndex];
+                [newSelectionIndexes shiftIndexesStartingAtIndex:anIndex by:-1];
+            }
+            else if ([newSelectionIndexes lastIndex] !== anIndex)
+                [newSelectionIndexes shiftIndexesStartingAtIndex:anIndex by:-1];
+        }];
+
     // Allow handlesContentAsCompoundValue reverse sets to trigger.
     [[CPBinder getBinding:@"contentArray" forObject:self] _contentArrayDidChange];
     _disableSetContent = NO;
@@ -1059,12 +1095,12 @@
 
 @implementation CPArrayController (CPBinder)
 
-+ (Class)_binderClassForBinding:(CPString)theBinding
++ (Class)_binderClassForBinding:(CPString)aBinding
 {
-    if (theBinding == @"contentArray")
+    if (aBinding == @"contentArray")
         return [_CPArrayControllerContentBinder class];
 
-    return [super _binderClassForBinding:theBinding];
+    return [super _binderClassForBinding:aBinding];
 }
 
 @end
@@ -1079,7 +1115,8 @@
         isCompound = [self handlesContentAsCompoundValue],
         dotIndex = keyPath.lastIndexOf("."),
         firstPart = dotIndex !== CPNotFound ? keyPath.substring(0, dotIndex) : nil,
-        isSelectionProxy = firstPart && [[destination valueForKeyPath:firstPart] isKindOfClass:CPControllerSelectionProxy];
+        isSelectionProxy = firstPart && [[destination valueForKeyPath:firstPart] isKindOfClass:CPControllerSelectionProxy],
+        newValue;
 
     if (!isCompound && !isSelectionProxy)
     {
@@ -1099,6 +1136,7 @@
     }
 
     var isPlaceholder = CPIsControllerMarker(newValue);
+
     if (isPlaceholder)
     {
         if (newValue === CPNotApplicableMarker && [options objectForKey:CPRaisesForNotApplicableKeysBindingOption])

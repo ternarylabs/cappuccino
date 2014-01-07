@@ -26,10 +26,8 @@
 @import "CPImage.j"
 @import "CPShadowView.j"
 
-
-CPScaleProportionally   = 0;
-CPScaleToFit            = 1;
-CPScaleNone             = 2;
+@global CPImagesPboardType
+@global appkit_tag_dom_elements
 
 CPImageAlignCenter      = 0;
 CPImageAlignTop         = 1;
@@ -64,9 +62,22 @@ var CPImageViewEmptyPlaceholderImage = nil;
 
 + (void)initialize
 {
+    if (self !== [CPImageView class])
+        return;
+
     var bundle = [CPBundle bundleForClass:[CPView class]];
 
     CPImageViewEmptyPlaceholderImage = [[CPImage alloc] initWithContentsOfFile:[bundle pathForResource:@"empty.png"]];
+}
+
++ (Class)_binderClassForBinding:(CPString)aBinding
+{
+    if (aBinding === CPValueBinding || aBinding === CPValueURLBinding || aBinding === CPValuePathBinding || aBinding === CPDataBinding)
+        return [CPImageViewValueBinder class];
+    else if ([aBinding hasPrefix:CPEditableBinding])
+        return [CPMultipleValueAndBinding class];
+
+    return [super _binderClassForBinding:aBinding];
 }
 
 - (id)initWithFrame:(CGRect)aFrame
@@ -76,24 +87,35 @@ var CPImageViewEmptyPlaceholderImage = nil;
     if (self)
     {
 #if PLATFORM(DOM)
-        _DOMImageElement = document.createElement("img");
-        _DOMImageElement.style.position = "absolute";
-        _DOMImageElement.style.left = "0px";
-        _DOMImageElement.style.top = "0px";
-
-        if ([CPPlatform supportsDragAndDrop])
-        {
-            _DOMImageElement.setAttribute("draggable", "true");
-            _DOMImageElement.style["-khtml-user-drag"] = "element";
-        }
-
-        CPDOMDisplayServerAppendChild(_DOMElement, _DOMImageElement);
-
-        _DOMImageElement.style.visibility = "hidden";
+        [self _createDOMImageElement];
 #endif
     }
 
     return self;
+}
+
+- (void)_createDOMImageElement
+{
+#if PLATFORM(DOM)
+    if (_DOMImageElement)
+        return;
+
+    _DOMImageElement = document.createElement("img");
+    _DOMImageElement.style.position = "absolute";
+    _DOMImageElement.style.left = "0px";
+    _DOMImageElement.style.top = "0px";
+
+    if ([CPPlatform supportsDragAndDrop])
+    {
+        _DOMImageElement.setAttribute("draggable", "true");
+        _DOMImageElement.style["-khtml-user-drag"] = "element";
+    }
+
+    _DOMImageElement.style.visibility = "hidden";
+    AppKitTagDOMElement(self, _DOMImageElement);
+
+    CPDOMDisplayServerAppendChild(_DOMElement, _DOMImageElement);
+#endif
 }
 
 /*!
@@ -127,6 +149,9 @@ var CPImageViewEmptyPlaceholderImage = nil;
     var newImage = [self objectValue];
 
 #if PLATFORM(DOM)
+    if (!_DOMImageElement)
+        [self _createDOMImageElement];
+
     _DOMImageElement.src = newImage ? [newImage filename] : [CPImageViewEmptyPlaceholderImage filename];
 #endif
 
@@ -232,7 +257,7 @@ var CPImageViewEmptyPlaceholderImage = nil;
     [super setImageScaling:anImageScaling];
 
 #if PLATFORM(DOM)
-    if ([self currentValueForThemeAttribute:@"image-scaling"] === CPScaleToFit)
+    if ([self currentValueForThemeAttribute:@"image-scaling"] === CPImageScaleAxesIndependently)
     {
         CPDOMDisplayServerSetStyleLeftTop(_DOMImageElement, NULL, 0.0, 0.0);
     }
@@ -242,7 +267,7 @@ var CPImageViewEmptyPlaceholderImage = nil;
     [self setNeedsDisplay:YES];
 }
 
-- (unsigned)imageScaling
+- (CPUInteger)imageScaling
 {
     return [self currentValueForThemeAttribute:@"image-scaling"];
 }
@@ -291,17 +316,17 @@ var CPImageViewEmptyPlaceholderImage = nil;
         y = 0.0,
         insetWidth = (_hasShadow ? [_shadowView horizontalInset] : 0.0),
         insetHeight = (_hasShadow ? [_shadowView verticalInset] : 0.0),
-        boundsWidth = _CGRectGetWidth(bounds),
-        boundsHeight = _CGRectGetHeight(bounds),
+        boundsWidth = CGRectGetWidth(bounds),
+        boundsHeight = CGRectGetHeight(bounds),
         width = boundsWidth - insetWidth,
         height = boundsHeight - insetHeight;
 
-    if (imageScaling === CPScaleToFit)
+    if (imageScaling === CPImageScaleAxesIndependently)
     {
-#if PLATFORM(DOM)
-        _DOMImageElement.width = ROUND(width);
-        _DOMImageElement.height = ROUND(height);
-#endif
+        #if PLATFORM(DOM)
+            _DOMImageElement.width = ROUND(width);
+            _DOMImageElement.height = ROUND(height);
+        #endif
     }
     else
     {
@@ -310,17 +335,19 @@ var CPImageViewEmptyPlaceholderImage = nil;
         if (size.width == -1 && size.height == -1)
             return;
 
-        if (imageScaling === CPScaleProportionally)
+        switch (imageScaling)
         {
-            // The max size it can be is size.width x size.height, so only
-            // only proportion otherwise.
-            if (width >= size.width && height >= size.height)
-            {
-                width = size.width;
-                height = size.height;
-            }
-            else
-            {
+            case CPImageScaleProportionallyDown:
+                if (width >= size.width && height >= size.height)
+                {
+                    width = size.width;
+                    height = size.height;
+                    break;
+                }
+
+                // intentionally fall through to the next case
+
+            case CPImageScaleProportionallyUpOrDown:
                 var imageRatio = size.width / size.height,
                     viewRatio = width / height;
 
@@ -328,26 +355,19 @@ var CPImageViewEmptyPlaceholderImage = nil;
                     width = height * imageRatio;
                 else
                     height = width / imageRatio;
-            }
+                break;
 
-#if PLATFORM(DOM)
+            case CPImageScaleAxesIndependently:
+            case CPImageScaleNone:
+                width = size.width;
+                height = size.height;
+                break;
+        }
+
+        #if PLATFORM(DOM)
             _DOMImageElement.width = ROUND(width);
             _DOMImageElement.height = ROUND(height);
-#endif
-        }
-        else
-        {
-            width = size.width;
-            height = size.height;
-        }
-
-        if (imageScaling == CPScaleNone)
-        {
-#if PLATFORM(DOM)
-            _DOMImageElement.width = ROUND(size.width);
-            _DOMImageElement.height = ROUND(size.height);
-#endif
-        }
+        #endif
 
         var x,
             y;
@@ -395,10 +415,10 @@ var CPImageViewEmptyPlaceholderImage = nil;
 #endif
     }
 
-    _imageRect = _CGRectMake(x, y, width, height);
+    _imageRect = CGRectMake(x, y, width, height);
 
     if (_hasShadow)
-        [_shadowView setFrame:_CGRectMake(x - [_shadowView leftInset], y - [_shadowView topInset], width + insetWidth, height + insetHeight)];
+        [_shadowView setFrame:CGRectMake(x - [_shadowView leftInset], y - [_shadowView topInset], width + insetWidth, height + insetHeight)];
 }
 
 - (void)mouseDown:(CPEvent)anEvent
@@ -449,6 +469,53 @@ var CPImageViewEmptyPlaceholderImage = nil;
 
 @end
 
+@implementation CPImageViewValueBinder : CPBinder
+{
+}
+
+- (void)_updatePlaceholdersWithOptions:(CPDictionary)options
+{
+    [self _setPlaceholder:nil forMarker:CPMultipleValuesMarker isDefault:YES];
+    [self _setPlaceholder:nil forMarker:CPNoSelectionMarker isDefault:YES];
+    [self _setPlaceholder:nil forMarker:CPNotApplicableMarker isDefault:YES];
+    [self _setPlaceholder:nil forMarker:CPNullMarker isDefault:YES];
+}
+
+- (void)setPlaceholderValue:(id)aValue withMarker:(CPString)aMarker forBinding:(CPString)aBinding
+{
+    [_source setImage:nil];
+}
+
+- (void)setValue:(id)aValue forBinding:(CPString)aBinding
+{
+    var image;
+
+    if (aValue == nil)
+        image = nil;
+    else if (aBinding === CPDataBinding)
+        image = [[CPImage alloc] initWithData:aValue];
+    else if (aBinding === CPValueURLBinding || aBinding === CPValuePathBinding)
+        image = [CPImage cachedImageWithContentsOfFile:aValue];
+    else if (aBinding === CPValueBinding)
+        image = aValue;
+
+    [_source setImage:image];
+}
+
+- (id)valueForBinding:(CPString)aBinding
+{
+    var image = [_source image];
+
+    if (aBinding === CPDataBinding)
+        return [image data];
+    else if (aBinding === CPValueURLBinding || aBinding === CPValuePathBinding)
+        return [image filename];
+    else if (aBinding === CPValueBinding)
+        return image;
+}
+
+@end
+
 var CPImageViewImageKey          = @"CPImageViewImageKey",
     CPImageViewImageScalingKey   = @"CPImageViewImageScalingKey",
     CPImageViewImageAlignmentKey = @"CPImageViewImageAlignmentKey",
@@ -464,31 +531,18 @@ var CPImageViewImageKey          = @"CPImageViewImageKey",
 */
 - (id)initWithCoder:(CPCoder)aCoder
 {
-#if PLATFORM(DOM)
-    _DOMImageElement = document.createElement("img");
-    _DOMImageElement.style.position = "absolute";
-    _DOMImageElement.style.left = "0px";
-    _DOMImageElement.style.top = "0px";
-    _DOMImageElement.style.visibility = "hidden";
-    if ([CPPlatform supportsDragAndDrop])
-    {
-        _DOMImageElement.setAttribute("draggable", "true");
-        _DOMImageElement.style["-khtml-user-drag"] = "element";
-    }
-#endif
-
     self = [super initWithCoder:aCoder];
 
     if (self)
     {
 #if PLATFORM(DOM)
-        _DOMElement.appendChild(_DOMImageElement);
+        [self _createDOMImageElement];
 #endif
 
         [self setHasShadow:[aCoder decodeBoolForKey:CPImageViewHasShadowKey]];
         [self setImageAlignment:[aCoder decodeIntForKey:CPImageViewImageAlignmentKey]];
 
-        if ([aCoder decodeBoolForKey:CPImageViewIsEditableKey] || NO)
+        if ([aCoder decodeBoolForKey:CPImageViewIsEditableKey])
             [self setEditable:YES];
 
         [self setNeedsLayout];
@@ -508,23 +562,36 @@ var CPImageViewImageKey          = @"CPImageViewImageKey",
     // We do this in order to avoid encoding the _shadowView, which
     // should just automatically be created programmatically as needed.
     if (_shadowView)
-    {
-        var actualSubviews = _subviews;
-
-        _subviews = [_subviews copy];
-        [_subviews removeObjectIdenticalTo:_shadowView];
-    }
+        [_shadowView removeFromSuperview];
 
     [super encodeWithCoder:aCoder];
 
     if (_shadowView)
-        _subviews = actualSubviews;
+        [self addSubview:_shadowView];
 
     [aCoder encodeBool:_hasShadow forKey:CPImageViewHasShadowKey];
     [aCoder encodeInt:_imageAlignment forKey:CPImageViewImageAlignmentKey];
 
     if (_isEditable)
         [aCoder encodeBool:_isEditable forKey:CPImageViewIsEditableKey];
+}
+
+@end
+
+@implementation CPImage (CachedImage)
+
++ (CPImage)cachedImageWithContentsOfFile:(CPString)aFile
+{
+    var cached_name = [CPString stringWithFormat:@"%@_%d", [self class], [aFile hash]],
+        image = [CPImage imageNamed:cached_name];
+
+    if (!image)
+    {
+        image = [[CPImage alloc] initWithContentsOfFile:aFile];
+        [image setName:cached_name];
+    }
+
+    return image;
 }
 
 @end

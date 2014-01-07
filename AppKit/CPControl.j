@@ -20,50 +20,58 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
-#import "../Foundation/Ref.h"
+@import <Foundation/CPFormatter.j>
+@import <Foundation/CPTimer.j>
 
-@import "../Foundation/CPFormatter.j"
 @import "CPFont.j"
 @import "CPShadow.j"
 @import "CPView.j"
 @import "CPKeyValueBinding.j"
 
-CPLeftTextAlignment             = 0;
-CPRightTextAlignment            = 1;
-CPCenterTextAlignment           = 2;
-CPJustifiedTextAlignment        = 3;
-CPNaturalTextAlignment          = 4;
+@global CPApp
 
-CPRegularControlSize            = 0;
-CPSmallControlSize              = 1;
-CPMiniControlSize               = 2;
+CPLeftTextAlignment      = 0;
+CPRightTextAlignment     = 1;
+CPCenterTextAlignment    = 2;
+CPJustifiedTextAlignment = 3;
+CPNaturalTextAlignment   = 4;
 
-CPLineBreakByWordWrapping       = 0;
-CPLineBreakByCharWrapping       = 1;
-CPLineBreakByClipping           = 2;
-CPLineBreakByTruncatingHead     = 3;
-CPLineBreakByTruncatingTail     = 4;
-CPLineBreakByTruncatingMiddle   = 5;
+CPRegularControlSize = 0;
+CPSmallControlSize   = 1;
+CPMiniControlSize    = 2;
 
-CPTopVerticalTextAlignment      = 1;
-CPCenterVerticalTextAlignment   = 2;
-CPBottomVerticalTextAlignment   = 3;
+CPLineBreakByWordWrapping     = 0;
+CPLineBreakByCharWrapping     = 1;
+CPLineBreakByClipping         = 2;
+CPLineBreakByTruncatingHead   = 3;
+CPLineBreakByTruncatingTail   = 4;
+CPLineBreakByTruncatingMiddle = 5;
 
-CPScaleProportionally           = 0;
-CPScaleToFit                    = 1;
-CPScaleNone                     = 2;
+CPTopVerticalTextAlignment    = 1;
+CPCenterVerticalTextAlignment = 2;
+CPBottomVerticalTextAlignment = 3;
 
-CPNoImage                       = 0;
-CPImageOnly                     = 1;
-CPImageLeft                     = 2;
-CPImageRight                    = 3;
-CPImageBelow                    = 4;
-CPImageAbove                    = 5;
-CPImageOverlaps                 = 6;
+// Deprecated for use with images, use the CPImageScale constants
+CPScaleProportionally = 0;
+CPScaleToFit          = 1;
+CPScaleNone           = 2;
 
-CPOnState                       = 1;
-CPOffState                      = 0;
-CPMixedState                    = -1;
+CPImageScaleProportionallyDown     = 0;
+CPImageScaleAxesIndependently      = 1;
+CPImageScaleNone                   = 2;
+CPImageScaleProportionallyUpOrDown = 3;
+
+CPNoImage       = 0;
+CPImageOnly     = 1;
+CPImageLeft     = 2;
+CPImageRight    = 3;
+CPImageBelow    = 4;
+CPImageAbove    = 5;
+CPImageOverlaps = 6;
+
+CPOnState    = 1;
+CPOffState   = 0;
+CPMixedState = -1;
 
 CPControlNormalBackgroundColor      = "CPControlNormalBackgroundColor";
 CPControlSelectedBackgroundColor    = "CPControlSelectedBackgroundColor";
@@ -102,52 +110,45 @@ var CPControlBlackColor = [CPColor blackColor];
 
 + (CPDictionary)themeAttributes
 {
-    return [CPDictionary dictionaryWithObjects:[CPLeftTextAlignment,
-                                                CPTopVerticalTextAlignment,
-                                                CPLineBreakByClipping,
-                                                [CPColor blackColor],
-                                                [CPFont systemFontOfSize:12.0],
-                                                [CPNull null],
-                                                _CGSizeMakeZero(),
-                                                CPImageLeft,
-                                                CPScaleToFit,
-                                                _CGSizeMakeZero(),
-                                                _CGSizeMake(-1.0, -1.0)]
-                                       forKeys:[@"alignment",
-                                                @"vertical-alignment",
-                                                @"line-break-mode",
-                                                @"text-color",
-                                                @"font",
-                                                @"text-shadow-color",
-                                                @"text-shadow-offset",
-                                                @"image-position",
-                                                @"image-scaling",
-                                                @"min-size",
-                                                @"max-size"]];
+    return @{
+            @"alignment": CPLeftTextAlignment,
+            @"vertical-alignment": CPTopVerticalTextAlignment,
+            @"line-break-mode": CPLineBreakByClipping,
+            @"text-color": [CPColor blackColor],
+            @"font": [CPFont systemFontOfSize:CPFontCurrentSystemSize],
+            @"text-shadow-color": [CPNull null],
+            @"text-shadow-offset": CGSizeMakeZero(),
+            @"image-position": CPImageLeft,
+            @"image-scaling": CPScaleToFit,
+            @"min-size": CGSizeMakeZero(),
+            @"max-size": CGSizeMake(-1.0, -1.0),
+        };
 }
 
 + (void)initialize
 {
-    if (self === [CPControl class])
-    {
-        [self exposeBinding:@"value"];
-        [self exposeBinding:@"objectValue"];
-        [self exposeBinding:@"stringValue"];
-        [self exposeBinding:@"integerValue"];
-        [self exposeBinding:@"intValue"];
-        [self exposeBinding:@"doubleValue"];
-        [self exposeBinding:@"floatValue"];
+    if (self !== [CPControl class])
+        return;
 
-        [self exposeBinding:@"enabled"];
-    }
+    [self exposeBinding:@"value"];
+    [self exposeBinding:@"objectValue"];
+    [self exposeBinding:@"stringValue"];
+    [self exposeBinding:@"integerValue"];
+    [self exposeBinding:@"intValue"];
+    [self exposeBinding:@"doubleValue"];
+    [self exposeBinding:@"floatValue"];
+
+    [self exposeBinding:@"enabled"];
 }
 
-+ (Class)_binderClassForBinding:(CPString)theBinding
++ (Class)_binderClassForBinding:(CPString)aBinding
 {
-    if (theBinding === CPValueBinding)
+    if (aBinding === CPValueBinding)
         return [_CPValueBinder class];
+    else if ([aBinding hasPrefix:CPEnabledBinding])
+        return [CPMultipleValueAndBinding class];
 
-    return [super _binderClassForBinding:theBinding];
+    return [super _binderClassForBinding:aBinding];
 }
 
 /*!
@@ -228,6 +229,9 @@ var CPControlBlackColor = [CPColor blackColor];
 - (BOOL)sendAction:(SEL)anAction to:(id)anObject
 {
     [self _reverseSetBinding];
+
+    var binding = [CPBinder getBinding:CPTargetBinding forObject:self];
+    [binding invokeAction];
 
     return [CPApp sendAction:anAction to:anObject from:self];
 }
@@ -318,11 +322,11 @@ var CPControlBlackColor = [CPColor blackColor];
     _previousTrackingLocation = currentLocation;
 }
 
-- (void)setState:(int)state
+- (void)setState:(CPInteger)state
 {
 }
 
-- (int)nextState
+- (CPInteger)nextState
 {
     return 0;
 }
@@ -385,7 +389,18 @@ var CPControlBlackColor = [CPColor blackColor];
 
 - (void)stopTracking:(CGPoint)lastPoint at:(CGPoint)aPoint mouseIsUp:(BOOL)mouseIsUp
 {
-    [self highlight:NO];
+    if (mouseIsUp)
+        [self highlight:NO];
+    else
+        [self highlight:YES];
+}
+
+/*!
+    Enabled controls accept first mouse by default.
+*/
+- (BOOL)acceptsFirstMouse:(CPEvent)anEvent
+{
+    return [self isEnabled];
 }
 
 - (void)mouseDown:(CPEvent)anEvent
@@ -507,7 +522,7 @@ var CPControlBlackColor = [CPColor blackColor];
 */
 - (CPString)stringValue
 {
-    if (_formatter && _value !== undefined && _value !== nil)
+    if (_formatter && _value !== undefined)
     {
         var formattedValue = [self hasThemeState:CPThemeStateEditing] ? [_formatter editingStringForObjectValue:_value] : [_formatter stringForObjectValue:_value];
 
@@ -515,7 +530,7 @@ var CPControlBlackColor = [CPColor blackColor];
             return formattedValue;
     }
 
-    return (_value === undefined || _value === nil) ? "" : String(_value);
+    return (_value === undefined || _value === nil) ? @"" : String(_value);
 }
 
 /*!
@@ -526,7 +541,7 @@ var CPControlBlackColor = [CPColor blackColor];
     // Cocoa raises an invalid parameter assertion and returns if you pass nil.
     if (aString === nil || aString === undefined)
     {
-        CPLog.warn("nil sent to CPControl -setStringValue");
+        CPLog.warn("nil or undefined sent to CPControl -setStringValue");
         return;
     }
 
@@ -536,10 +551,10 @@ var CPControlBlackColor = [CPColor blackColor];
     {
         value = nil;
 
-        if ([_formatter getObjectValue:AT_REF(value) forString:aString errorDescription:nil] === NO)
+        if ([_formatter getObjectValue:@ref(value) forString:aString errorDescription:nil] === NO)
         {
             // If the given string is non-empty and doesn't work, Cocoa tries an empty string.
-            if (!aString || [_formatter getObjectValue:AT_REF(value) forString:@"" errorDescription:nil] === NO)
+            if (!aString || [_formatter getObjectValue:@ref(value) forString:@"" errorDescription:nil] === NO)
                 value = undefined;  // Means the value is invalid
         }
     }
@@ -592,7 +607,7 @@ var CPControlBlackColor = [CPColor blackColor];
     if ([note object] != self)
         return;
 
-    [[CPNotificationCenter defaultCenter] postNotificationName:CPControlTextDidBeginEditingNotification object:self userInfo:[CPDictionary dictionaryWithObject:[note object] forKey:"CPFieldEditor"]];
+    [[CPNotificationCenter defaultCenter] postNotificationName:CPControlTextDidBeginEditingNotification object:self userInfo:@{"CPFieldEditor": [note object]}];
 }
 
 - (void)textDidChange:(CPNotification)note
@@ -601,7 +616,7 @@ var CPControlBlackColor = [CPColor blackColor];
     if ([note object] != self)
         return;
 
-    [[CPNotificationCenter defaultCenter] postNotificationName:CPControlTextDidChangeNotification object:self userInfo:[CPDictionary dictionaryWithObject:[note object] forKey:"CPFieldEditor"]];
+    [[CPNotificationCenter defaultCenter] postNotificationName:CPControlTextDidChangeNotification object:self userInfo:@{"CPFieldEditor": [note object]}];
 }
 
 - (void)textDidEndEditing:(CPNotification)note
@@ -612,7 +627,49 @@ var CPControlBlackColor = [CPColor blackColor];
 
     [self _reverseSetBinding];
 
-    [[CPNotificationCenter defaultCenter] postNotificationName:CPControlTextDidEndEditingNotification object:self userInfo:[CPDictionary dictionaryWithObject:[note object] forKey:"CPFieldEditor"]];
+    [[CPNotificationCenter defaultCenter] postNotificationName:CPControlTextDidEndEditingNotification object:self userInfo:[note userInfo]];
+}
+
+/*!
+    @ignore
+    Return the currentTextMovement needed by the delegate textDidEndEditing
+    This is going to check the currentEvent of the CPApp
+*/
+- (unsigned)_currentTextMovement
+{
+    var currentEvent = [CPApp currentEvent],
+        keyCode = [currentEvent keyCode],
+        modifierFlags = [currentEvent modifierFlags];
+
+    switch (keyCode)
+    {
+        case CPEscapeKeyCode:
+            return CPCancelTextMovement;
+
+        case CPLeftArrowKeyCode:
+            return CPLeftTextMovement;
+
+        case CPRightArrowKeyCode:
+            return CPRightTextMovement;
+
+        case CPUpArrowKeyCode:
+            return CPUpTextMovement;
+
+        case CPDownArrowKeyCode:
+            return CPDownTextMovement;
+
+        case CPReturnKeyCode:
+            return CPReturnTextMovement;
+
+        case CPTabKeyCode:
+            if (modifierFlags & CPShiftKeyMask)
+                return CPBacktabTextMovement;
+
+            return CPTabTextMovement;
+
+        default:
+            return CPOtherTextMovement;
+    }
 }
 
 /*!
@@ -784,9 +841,10 @@ var CPControlBlackColor = [CPColor blackColor];
     Sets the image scaling of the control.
 
     <pre>
-    CPScaleProportionally
-    CPScaleToFit
-    CPScaleNone
+    CPImageScaleProportionallyDown
+    CPImageScaleAxesIndependently
+    CPImageScaleNone
+    CPImageScaleProportionallyUpOrDown
     </pre>
 */
 - (void)setImageScaling:(CPImageScaling)scaling
@@ -797,7 +855,7 @@ var CPControlBlackColor = [CPColor blackColor];
 /*!
     Returns the image scaling of the control.
 */
-- (CPImageScaling)imageScaling
+- (CPUInteger)imageScaling
 {
     return [self valueForThemeAttribute:@"image-scaling"];
 }
@@ -857,17 +915,16 @@ var CPControlBlackColor = [CPColor blackColor];
 
 @end
 
-var CPControlValueKey           = "CPControlValueKey",
-    CPControlControlStateKey    = @"CPControlControlStateKey",
-    CPControlIsEnabledKey       = "CPControlIsEnabledKey",
+var CPControlValueKey                   = @"CPControlValueKey",
+    CPControlControlStateKey            = @"CPControlControlStateKey",
+    CPControlIsEnabledKey               = @"CPControlIsEnabledKey",
+    CPControlTargetKey                  = @"CPControlTargetKey",
+    CPControlActionKey                  = @"CPControlActionKey",
+    CPControlSendActionOnKey            = @"CPControlSendActionOnKey",
+    CPControlFormatterKey               = @"CPControlFormatterKey",
+    CPControlSendsActionOnEndEditingKey = @"CPControlSendsActionOnEndEditingKey",
 
-    CPControlTargetKey          = "CPControlTargetKey",
-    CPControlActionKey          = "CPControlActionKey",
-    CPControlSendActionOnKey    = "CPControlSendActionOnKey",
-
-    CPControlSendsActionOnEndEditingKey = "CPControlSendsActionOnEndEditingKey";
-
-var __Deprecated__CPImageViewImageKey   = @"CPImageViewImageKey";
+    __Deprecated__CPImageViewImageKey   = @"CPImageViewImageKey";
 
 @implementation CPControl (CPCoding)
 
@@ -890,6 +947,8 @@ var __Deprecated__CPImageViewImageKey   = @"CPImageViewImageKey";
 
         [self sendActionOn:[aCoder decodeIntForKey:CPControlSendActionOnKey]];
         [self setSendsActionOnEndEditing:[aCoder decodeBoolForKey:CPControlSendsActionOnEndEditingKey]];
+
+        [self setFormatter:[aCoder decodeObjectForKey:CPControlFormatterKey]];
     }
 
     return self;
@@ -919,6 +978,9 @@ var __Deprecated__CPImageViewImageKey   = @"CPImageViewImageKey";
         [aCoder encodeObject:_action forKey:CPControlActionKey];
 
     [aCoder encodeInt:_sendActionOn forKey:CPControlSendActionOnKey];
+
+    if (_formatter !== nil)
+        [aCoder encodeObject:_formatter forKey:CPControlFormatterKey];
 }
 
 @end

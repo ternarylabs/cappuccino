@@ -20,8 +20,8 @@
  */
 
 @import "CPArray.j"
-@import "CPExpression.j"
 @import "CPString.j"
+@import "_CPExpression.j"
 
 @implementation _CPAggregateExpression : CPExpression
 {
@@ -42,7 +42,7 @@
     if (self === object)
         return YES;
 
-    if (object.isa !== self.isa || ![[object collection] isEqual:_aggregate])
+    if (object === nil || object.isa !== self.isa || ![[object collection] isEqual:_aggregate])
         return NO;
 
     return YES;

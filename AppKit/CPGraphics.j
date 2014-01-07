@@ -23,6 +23,16 @@
 @import "CPColor.j"
 @import "CPGraphicsContext.j"
 
+CPCalibratedWhiteColorSpace = @"CalibratedWhiteColorSpace";
+CPCalibratedBlackColorSpace = @"CalibratedBlackColorSpace";
+CPCalibratedRGBColorSpace   = @"CalibratedRGBColorSpace";
+CPDeviceWhiteColorSpace     = @"DeviceWhiteColorSpace";
+CPDeviceBlackColorSpace     = @"DeviceBlackColorSpace";
+CPDeviceRGBColorSpace       = @"DeviceRGBColorSpace";
+CPDeviceCMYKColorSpace      = @"DeviceCMYKColorSpace";
+CPNamedColorSpace           = @"NamedColorSpace";
+CPPatternColorSpace         = @"PatternColorSpace";
+CPCustomColorSpace          = @"CustomColorSpace";
 
 function CPDrawTiledRects(
    /* CGRect */ boundsRect,
@@ -50,9 +60,9 @@ function CPDrawColorTiledRects(
     if (sides.length != colors.length)
         [CPException raise:CPInvalidArgumentException reason:@"sides (length: " + sides.length + ") and colors (length: " + colors.length + ") must have the same length."];
 
-    var resultRect = _CGRectMakeCopy(boundsRect),
-        slice = _CGRectMakeZero(),
-        remainder = _CGRectMakeZero(),
+    var resultRect = CGRectMakeCopy(boundsRect),
+        slice = CGRectMakeZero(),
+        remainder = CGRectMakeZero(),
         context = [[CPGraphicsContext currentContext] graphicsPort];
 
     CGContextSaveGState(context);
@@ -67,31 +77,34 @@ function CPDrawColorTiledRects(
         slice = CGRectIntersection(slice, clipRect);
 
         // Cocoa docs say that only slices that are within the clipRect are actually drawn
-        if (_CGRectIsEmpty(slice))
+        if (CGRectIsEmpty(slice))
             continue;
 
-        var minX, maxX, minY, maxY;
+        var minX,
+            maxX,
+            minY,
+            maxY;
 
         if (side == CPMinXEdge || side == CPMaxXEdge)
         {
             // Make sure we have at least 1 pixel to draw a line
-            if (_CGRectGetWidth(slice) < 1.0)
+            if (CGRectGetWidth(slice) < 1.0)
                 continue;
 
-            minX = _CGRectGetMinX(slice) + 0.5;
+            minX = CGRectGetMinX(slice) + 0.5;
             maxX = minX;
-            minY = _CGRectGetMinY(slice);
-            maxY = _CGRectGetMaxY(slice);
+            minY = CGRectGetMinY(slice);
+            maxY = CGRectGetMaxY(slice);
         }
         else // CPMinYEdge || CPMaxYEdge
         {
             // Make sure we have at least 1 pixel to draw a line
-            if (_CGRectGetHeight(slice) < 1.0)
+            if (CGRectGetHeight(slice) < 1.0)
                 continue;
 
-            minX = _CGRectGetMinX(slice);
-            maxX = _CGRectGetMaxX(slice);
-            minY = _CGRectGetMinY(slice) + 0.5;
+            minX = CGRectGetMinX(slice);
+            maxX = CGRectGetMaxX(slice);
+            minY = CGRectGetMinY(slice) + 0.5;
             maxY = minY;
         }
 

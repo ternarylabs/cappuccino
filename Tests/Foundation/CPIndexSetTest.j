@@ -24,42 +24,42 @@ function descriptionWithoutEntity(aString)
     [self assert:descriptionWithoutEntity(indexSet) equals:@"(no indexes)"];
 
     // Test adding initial range
-    [indexSet addIndexesInRange:CPMakeRange(30,10)];
+    [indexSet addIndexesInRange:CPMakeRange(30, 10)];
 
     [self assert:@"[number of indexes: 10 (in 1 range), indexes: (30-39)]" equals:descriptionWithoutEntity(indexSet)];
 
     // Test adding range after existing ranges.
-    [indexSet addIndexesInRange:CPMakeRange(50,10)];
+    [indexSet addIndexesInRange:CPMakeRange(50, 10)];
 
     [self assert:@"[number of indexes: 20 (in 2 ranges), indexes: (30-39 50-59)]" equals:descriptionWithoutEntity(indexSet)];
 
     // Test adding range before existing ranges.
-    [indexSet addIndexesInRange:CPMakeRange(10,10)];
+    [indexSet addIndexesInRange:CPMakeRange(10, 10)];
 
     [self assert:@"[number of indexes: 30 (in 3 ranges), indexes: (10-19 30-39 50-59)]" equals:descriptionWithoutEntity(indexSet)];
 
     // Test adding range inbetween existing ranges.
-    [indexSet addIndexesInRange:CPMakeRange(45,2)];
+    [indexSet addIndexesInRange:CPMakeRange(45, 2)];
 
     [self assert:@"[number of indexes: 32 (in 4 ranges), indexes: (10-19 30-39 45-46 50-59)]" equals:descriptionWithoutEntity(indexSet)];
 
     // Test adding single index inbetween existing ranges.
-    [indexSet addIndexesInRange:CPMakeRange(23,1)];
+    [indexSet addIndexesInRange:CPMakeRange(23, 1)];
 
     [self assert:@"[number of indexes: 33 (in 5 ranges), indexes: (10-19 23 30-39 45-46 50-59)]" equals:descriptionWithoutEntity(indexSet)];
 
     // Test adding range inbetween existing ranges that forces a combination
-    [indexSet addIndexesInRange:CPMakeRange(47,3)];
+    [indexSet addIndexesInRange:CPMakeRange(47, 3)];
 
     [self assert:@"[number of indexes: 36 (in 4 ranges), indexes: (10-19 23 30-39 45-59)]" equals:descriptionWithoutEntity(indexSet)];
 
     // Test adding range across ranges forcing a combination
-    [indexSet addIndexesInRange:CPMakeRange(35,15)];
+    [indexSet addIndexesInRange:CPMakeRange(35, 15)];
 
     [self assert:@"[number of indexes: 41 (in 3 ranges), indexes: (10-19 23 30-59)]" equals:descriptionWithoutEntity(indexSet)];
 
     // Test adding range across two empty slots forcing a combination
-    [indexSet addIndexesInRange:CPMakeRange(5,70)];
+    [indexSet addIndexesInRange:CPMakeRange(5, 70)];
 
     [self assert:@"[number of indexes: 70 (in 1 range), indexes: (5-74)]" equals:descriptionWithoutEntity(indexSet)];
 
@@ -67,6 +67,8 @@ function descriptionWithoutEntity(aString)
     [indexSet addIndex:4];
 
     [self assert:@"[number of indexes: 71 (in 1 range), indexes: (4-74)]" equals:descriptionWithoutEntity(indexSet)];
+
+    [self assertThrows:function() { [indexSet addIndex:CPNotFound]; }];
 }
 
 - (void)testRemoveIndexes
@@ -202,6 +204,7 @@ function descriptionWithoutEntity(aString)
     [self assertTrue:[[CPIndexSet indexSetWithIndex:1] containsIndex:1]];
     [self assertTrue:[[CPIndexSet indexSetWithIndex:0] containsIndex:0]];
     [self assertFalse:[[CPIndexSet indexSetWithIndex:0] containsIndex:1]];
+    [self assertThrows:function() { [CPIndexSet indexSetWithIndex:NaN] }];
 }
 
 - (void)testIndexSetWithIndexesInRange
@@ -288,6 +291,9 @@ function descriptionWithoutEntity(aString)
 {
     [self assert:[_set lastIndex] equals:19];
     [self assert:[[CPIndexSet indexSet] lastIndex] equals:CPNotFound];
+
+    var singleIndexSet = [CPIndexSet indexSetWithIndex:3];
+    [self assert:3 equals:[singleIndexSet lastIndex]];
 }
 /*
 - (void)testAddSpeed
@@ -536,11 +542,125 @@ function descriptionWithoutEntity(aString)
     {
         visitedIndexes.push(idx);
         if (visitedIndexes.length >= 2)
-            stop(YES); // AT_DEREF(stop, YES) - FIXME Replace with proper @ref @deref when in ObjJ.
+            @deref(stop) = YES;
     }
 
     [set0 enumerateIndexesUsingBlock:aBlock];
     [self assert:[0, 3] equals:visitedIndexes message:"enumeration should stop after 2 results"];
+}
+
+- (void)testIndexPassingTest
+{
+    var set0 = [CPMutableIndexSet indexSet],
+        index = [set0 indexPassingTest:function(anIndex)
+        {
+            return anIndex % 2 === 0;
+        }];
+
+    [self assertTrue:index === CPNotFound message:"must be equal to CPNotFound, was " + index];
+
+    [set0 addIndexesInRange:CPMakeRange(1, 10)];
+    index = [set0 indexPassingTest:function(anIndex)
+        {
+            return anIndex % 2 === 0;
+        }];
+
+    [self assertTrue:index === 2 message:"index must be equal to 2"];
+
+    index = [set0 indexPassingTest:function(anIndex)
+        {
+            return anIndex === 1000;
+        }];
+
+    [self assertTrue:index === CPNotFound message:"must be equal to CPNotFound, was " + index];
+}
+
+- (void)testIndexesPassingTest
+{
+    var set0 = [CPMutableIndexSet indexSet],
+        set1 = [CPMutableIndexSet indexSet],
+        indexes = [set0 indexesPassingTest:function(anIndex)
+        {
+            return anIndex % 2 === 0;
+        }];
+
+    [self assertTrue:[indexes isEqualToIndexSet:set1] message:"must be equal to " + [set1 description] + ", was " + [indexes description]];
+
+    [set0 addIndexesInRange:CPMakeRange(1, 10)];
+    [set1 addIndex:2];
+    [set1 addIndex:4];
+    [set1 addIndex:6];
+    [set1 addIndex:8];
+    [set1 addIndex:10];
+    indexes = [set0 indexesPassingTest:function(anIndex)
+        {
+            return anIndex % 2 === 0;
+        }];
+
+    [self assertTrue:[indexes isEqualToIndexSet:set1] message:"must be equal to " + [set1 description] + ", was " + [indexes description]];
+}
+
+- (void)testIndexPassingTest_options
+{
+    var set0 = [CPMutableIndexSet indexSetWithIndexesInRange:CPMakeRange(1, 10)],
+        index = [set0 indexWithOptions:CPEnumerationReverse
+                           passingTest:function(anIndex)
+        {
+            return anIndex % 2 === 0;
+        }];
+
+    [self assertTrue:index === 10 message:"index must be equal to 10"];
+}
+
+- (void)testIndexesPassingTest_options
+{
+    var set0 = [CPMutableIndexSet indexSetWithIndexesInRange:CPMakeRange(1, 5)],
+        set1 = [CPMutableIndexSet indexSet],
+        visitedIndexes = [],
+        indexes = [set0 indexesWithOptions:CPEnumerationReverse
+                               passingTest:function(anIndex)
+        {
+            visitedIndexes.push(anIndex);
+            return anIndex % 2 === 0;
+        }];
+
+    [set1 addIndex:2];
+    [set1 addIndex:4];
+
+    [self assertTrue:[indexes isEqualToIndexSet:set1] message:"must be equal to " + [set1 description] + ", was " + [indexes description]];
+    [self assert:[5, 4, 3, 2, 1] equals:visitedIndexes message:"enumeration should be done in reverse"];
+}
+
+- (void)testIndexPassingTest_options_range
+{
+    var set0 = [CPMutableIndexSet indexSetWithIndexesInRange:CPMakeRange(1, 10)],
+        index = [set0 indexInRange:CPMakeRange(3, 4)
+                           options:CPEnumerationReverse
+                       passingTest:function(anIndex)
+        {
+            return anIndex % 2 === 0;
+        }];
+
+    [self assertTrue:index === 6 message:"index must be equal to 6"];
+}
+
+- (void)testIndexesPassingTest_options_range
+{
+    var set0 = [CPMutableIndexSet indexSetWithIndexesInRange:CPMakeRange(1, 5)],
+        set1 = [CPMutableIndexSet indexSet],
+        visitedIndexes = [],
+        indexes = [set0 indexesInRange:CPMakeRange(3, 4)
+                               options:CPEnumerationReverse
+                           passingTest:function(anIndex)
+        {
+            visitedIndexes.push(anIndex);
+            return anIndex % 2 === 0;
+        }];
+
+    [set1 addIndex:4];
+
+    [self assertTrue:[indexes isEqualToIndexSet:set1] message:"must be equal to " + [set1 description] + ", was " + [indexes description]];
+    [self assert:[5, 4, 3] equals:visitedIndexes message:"enumeration should be done in reverse"];
 }
 
 - (void)tearDown

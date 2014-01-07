@@ -22,34 +22,40 @@
 
 @import <AppKit/CPImageView.j>
 
+@import "NSCell.j"
+
 
 @implementation CPImageView (NSCoding)
 
 - (id)NS_initWithCoder:(CPCoder)aCoder
 {
-    self = [super NS_initWithCoder:aCoder];
+    return [super NS_initWithCoder:aCoder];
+}
 
-    if (self)
-    {
-        var cell = [aCoder decodeObjectForKey:@"NSCell"];
+- (void)NS_initWithCell:(NSCell)cell
+{
+    [super NS_initWithCell:cell];
 
-        [self setImageScaling:[cell imageScaling]];
-        [self setImageAlignment:[cell imageAlignment]];
-        _isEditable = [cell isEditable];
-    }
-
-    return self;
+    [self setImageScaling:[cell imageScaling]];
+    [self setImageAlignment:[cell imageAlignment]];
+    _isEditable = [cell isEditable];
 }
 
 @end
 
 @implementation NSImageView : CPImageView
-{
-}
 
 - (id)initWithCoder:(CPCoder)aCoder
 {
-    return [super NS_initWithCoder:aCoder];
+    self = [self NS_initWithCoder:aCoder];
+
+    if (self)
+    {
+        var cell = [aCoder decodeObjectForKey:@"NSCell"];
+        [self NS_initWithCell:cell];
+    }
+
+    return self;
 }
 
 - (Class)classForKeyedArchiver
@@ -83,13 +89,6 @@ NSImageFrameGrayBezel   = 2;
 NSImageFrameGroove      = 3;
 NSImageFrameButton      = 4;
 
-var NSImageScalingToCPImageScaling = {};
-
-NSImageScalingToCPImageScaling[NSImageScaleProportionallyDown]      = CPScaleProportionally;
-NSImageScalingToCPImageScaling[NSImageScaleAxesIndependently]       = CPScaleToFit;
-NSImageScalingToCPImageScaling[NSImageScaleNone]                    = CPScaleNone;
-NSImageScalingToCPImageScaling[NSImageScaleProportionallyUpOrDown]  = CPScaleProportionally;
-
 @implementation NSImageCell : NSCell
 {
     BOOL                _animates       @accessors;
@@ -106,7 +105,7 @@ NSImageScalingToCPImageScaling[NSImageScaleProportionallyUpOrDown]  = CPScalePro
     {
         _animates = [aCoder decodeBoolForKey:@"NSAnimates"];
         _imageAlignment = [aCoder decodeIntForKey:@"NSAlign"];
-        _imageScaling = NSImageScalingToCPImageScaling[[aCoder decodeIntForKey:@"NSScale"]];
+        _imageScaling = [aCoder decodeIntForKey:@"NSScale"];
         _frameStyle = [aCoder decodeIntForKey:@"NSStyle"];
     }
 

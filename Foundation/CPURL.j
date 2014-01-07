@@ -122,8 +122,8 @@ CPURLCustomIconKey                  = @"CPURLCustomIconKey";
 
 - (CPArray)pathComponents
 {
-    var path = self.pathComponents();
-    return [path copy];
+    var components = self.pathComponents();
+    return [components copy];
 }
 
 // if absolute, returns the same as path
@@ -202,6 +202,13 @@ CPURLCustomIconKey                  = @"CPURLCustomIconKey";
     return self.pathExtension();
 }
 
+- (CPURL)URLByDeletingLastPathComponent
+{
+    var result = self.createCopyDeletingLastPathComponent();
+    result.isa = [self class];
+    return result;
+}
+
 - (CPURL)standardizedURL
 {
     return self.standardizedURL();
@@ -247,8 +254,8 @@ var CPURLURLStringKey   = @"CPURLURLStringKey",
 
 - (void)encodeWithCoder:(CPCoder)aCoder
 {
-    [aCoder encodeObject:_baseURL forKey:CPURLBaseURLKey];
-    [aCoder encodeObject:_string forKey:CPURLURLStringKey];
+    [aCoder encodeObject:self._baseURL forKey:CPURLBaseURLKey];
+    [aCoder encodeObject:self._string forKey:CPURLURLStringKey];
 }
 
 @end

@@ -30,12 +30,10 @@
 @import "NSCell.j"
 @import "NSControl.j"
 
+@class Nib2Cib
 
-var _CPButtonBezelStyleHeights = {};
+@global NIB_CONNECTION_EQUIVALENCY_TABLE
 
-_CPButtonBezelStyleHeights[CPRoundedBezelStyle] = 18;
-_CPButtonBezelStyleHeights[CPTexturedRoundedBezelStyle] = 20;
-_CPButtonBezelStyleHeights[CPHUDBezelStyle] = 20;
 
 var NSButtonIsBorderedMask = 0x00800000,
     NSButtonAllowsMixedStateMask = 0x1000000,
@@ -50,30 +48,35 @@ var NSButtonIsBorderedMask = 0x00800000,
     NSButtonImageRightPositionMask = 0x2C,
     NSButtonImageLeftPositionMask = 0x3C,
     NSButtonImageOnlyPositionMask = 0x44,
-    NSButtonImageOverlapsPositionMask = 0x6C;
+    NSButtonImageOverlapsPositionMask = 0x6C,
+
+    // You cannot set neither highlightsBy nor showsStateBy in IB,
+    // but you can set button type which implicitly sets the masks.
+    // Note that you cannot set NSPushInCellMask for showsStateBy.
+    NSHighlightsByPushInCellMask = 0x80000000,
+    NSHighlightsByContentsCellMask = 0x08000000,
+    NSHighlightsByChangeGrayCellMask =  0x04000000,
+    NSHighlightsByChangeBackgroundCellMask = 0x02000000,
+    NSShowsStateByContentsCellMask = 0x40000000,
+    NSShowsStateByChangeGrayCellMask = 0x20000000,
+    NSShowsStateByChangeBackgroundCellMask = 0x10000000;
 
 
 @implementation CPButton (NSCoding)
 
 - (id)NS_initWithCoder:(CPCoder)aCoder
 {
-    self = [super NS_initWithCoder:aCoder];
-
-    if (self)
-    {
-        var cell = [aCoder decodeObjectForKey:@"NSCell"];
-        self = [self NS_initWithCell:cell];
-    }
-
-    return self;
+    return [super NS_initWithCoder:aCoder];
 }
 
 /*!
     Intialise a button given a cell. This method is meant for reuse by controls which contain
     cells other than CPButton itself.
 */
-- (id)NS_initWithCell:(NSCell)cell
+- (void)NS_initWithCell:(NSCell)cell
 {
+    [super NS_initWithCell:cell];
+
     var alternateImage = [cell alternateImage],
         positionOffsetSizeWidth = 0,
         positionOffsetOriginX = 0,
@@ -101,71 +104,92 @@ var NSButtonIsBorderedMask = 0x00800000,
         }
 
         _themeClass = [[self class] defaultThemeClass];
+        alternateImage = nil;
     }
 
     NIB_CONNECTION_EQUIVALENCY_TABLE[[cell UID]] = self;
 
     _title = [cell title];
+    _alternateTitle = [cell alternateTitle];
     _controlSize = CPRegularControlSize;
 
     [self setBordered:[cell isBordered]];
     _bezelStyle = [cell bezelStyle];
 
+    var fixedHeight;
 
-    // clean up:
+    // Map Cocoa bezel styles to Cappuccino bezel styles and adjust frame
     switch (_bezelStyle)
     {
         // implemented:
-        case CPRoundedBezelStyle:
+        case CPRoundedBezelStyle:  // Push IB style
             positionOffsetOriginY = 6;
-            positionOffsetOriginX = 4;
-            positionOffsetSizeWidth = -12;
+            positionOffsetOriginX = 6;
+            positionOffsetSizeWidth = -12
+            fixedHeight = YES;
             break;
-        case CPTexturedRoundedBezelStyle:
+
+        case CPTexturedRoundedBezelStyle:  // Round Textured IB style
             positionOffsetOriginY = 2;
             positionOffsetOriginX = -2;
             positionOffsetSizeWidth = 0;
+            fixedHeight = YES;
             break;
+
         case CPHUDBezelStyle:
+            fixedHeight = YES;
             break;
+
         // approximations:
-        case CPRoundRectBezelStyle:
+        case CPRoundRectBezelStyle:  // Round Rect IB style
             positionOffsetOriginY = -3;
             positionOffsetOriginX = -2;
             positionOffsetSizeWidth = 0;
             _bezelStyle = CPRoundedBezelStyle;
+            fixedHeight = YES;
             break;
-        case CPSmallSquareBezelStyle:
+
+        case CPSmallSquareBezelStyle:  // Gradient IB style
             positionOffsetOriginX = -2;
             positionOffsetSizeWidth = 0;
             _bezelStyle = CPTexturedRoundedBezelStyle;
+            fixedHeight = NO;
             break;
-        case CPThickSquareBezelStyle:
+
+        case CPThickSquareBezelStyle:  // Bevel IB style
         case CPThickerSquareBezelStyle:
         case CPRegularSquareBezelStyle:
             positionOffsetOriginY = 3;
             positionOffsetOriginX = 0;
             positionOffsetSizeWidth = -4;
             _bezelStyle = CPTexturedRoundedBezelStyle;
+            fixedHeight = NO;
             break;
-        case CPTexturedSquareBezelStyle:
+
+        case CPTexturedSquareBezelStyle:  // Textured IB style
             positionOffsetOriginY = 4;
             positionOffsetOriginX = -1;
             positionOffsetSizeWidth = -2;
             _bezelStyle = CPTexturedRoundedBezelStyle;
+            fixedHeight = NO;
             break;
-        case CPShadowlessSquareBezelStyle:
+
+        case CPShadowlessSquareBezelStyle:  // Square IB style
             positionOffsetOriginY = 5;
             positionOffsetOriginX = -2;
             positionOffsetSizeWidth = 0;
             _bezelStyle = CPTexturedRoundedBezelStyle;
+            fixedHeight = NO;
             break;
-        case CPRecessedBezelStyle:
+
+        case CPRecessedBezelStyle:  // Recessed IB style
             positionOffsetOriginY = -3;
             positionOffsetOriginX = -2;
             positionOffsetSizeWidth = 0;
             _bezelStyle = CPHUDBezelStyle;
+            fixedHeight = YES;
             break;
+
         // unsupported
         case CPRoundedDisclosureBezelStyle:
         case CPHelpButtonBezelStyle:
@@ -173,37 +197,78 @@ var NSButtonIsBorderedMask = 0x00800000,
         case CPDisclosureBezelStyle:
             CPLog.warn("NSButton [%s]: unsupported bezel style: %d", _title == null ? "<no title>" : '"' + _title + '"', _bezelStyle);
             _bezelStyle = CPHUDBezelStyle;
+            fixedHeight = YES;
             break;
+
         // error:
         default:
             CPLog.warn("NSButton [%s]: unknown bezel style: %d", _title == null ? "<no title>" : '"' + _title + '"', _bezelStyle);
             _bezelStyle = CPHUDBezelStyle;
+            fixedHeight = YES;
     }
 
-    if ([cell isBordered])
+    if ([cell isBordered] || [self isKindOfClass:[CPRadio class]] || [self isKindOfClass:[CPCheckBox class]])
     {
-        CPLog.debug("NSButton [%s]: adjusting height from %d to %d", _title == null ? "<no title>" : '"' + _title + '"', _frame.size.height, CPButtonDefaultHeight);
-        _frame.size.height = CPButtonDefaultHeight;
+        /*
+            Try to figure out the intention of the theme in regards to fixed height buttons.
 
-        // Reposition the buttons according to its particular offsets
-        _frame.origin.x += positionOffsetOriginX;
-        _frame.origin.y += positionOffsetOriginY;
-        _frame.size.width += positionOffsetSizeWidth;
-        _bounds.size.width += positionOffsetSizeWidth;
+            - If there is a min height and a max height and they are the same, the theme must
+              not support variable button heights. In that case all buttons are considered fixed height.
+            - If there is just a max height, use that for only for fixed height buttons.
+            - If there is no max height either, don't do any height adjustments.
+        */
+        var theme = [Nib2Cib defaultTheme],
+            minSize = [theme valueForAttributeWithName:@"min-size" forClass:[self class]],
+            maxSize = [theme valueForAttributeWithName:@"max-size" forClass:[self class]],
+            adjustHeight = NO;
 
-        _bounds.size.height = CPButtonDefaultHeight;
+        if (minSize.height > 0 && maxSize.height > 0 && minSize.height === maxSize.height)
+        {
+            adjustHeight = YES;
+            fixedHeight = minSize.height === maxSize.height;
+        }
+        else if (minSize.height < 0 && maxSize.height > 0)
+            adjustHeight = fixedHeight;
+        else
+            adjustHeight = minSize.height > 0 || maxSize.height > 0;
+
+        if (adjustHeight)
+        {
+            var oldHeight = _frame.size.height;
+
+            if (minSize.height > 0)
+                _frame.size.height = _bounds.size.height = MAX(_frame.size.height, minSize.height);
+
+            if (maxSize.height > 0)
+                _frame.size.height = _bounds.size.height = MIN(_frame.size.height, maxSize.height);
+
+            if (_frame.size.height !== oldHeight)
+                CPLog.debug("NSButton [%s]: adjusted height from %d to %d", _title == null ? "<no title>" : '"' + _title + '"', oldHeight, _frame.size.height);
+        }
+
+        if ([cell isBordered])
+        {
+            // Reposition the buttons according to its particular offsets
+            _frame.origin.x += positionOffsetOriginX;
+            _frame.origin.y += positionOffsetOriginY;
+            _frame.size.width += positionOffsetSizeWidth;
+            _bounds.size.width += positionOffsetSizeWidth;
+        }
     }
 
     _keyEquivalent = [cell keyEquivalent];
     _keyEquivalentModifierMask = [cell keyEquivalentModifierMask];
+    _imageDimsWhenDisabled = YES;
 
     _allowsMixedState = [cell allowsMixedState];
     [self setImage:[cell normalImage]];
+    [self setAlternateImage:alternateImage];
     [self setImagePosition:[cell imagePosition]];
 
     [self setEnabled:[cell isEnabled]];
 
-    return self;
+    _highlightsBy = [cell highlightsBy];
+    _showsStateBy = [cell showsStateBy];
 }
 
 @end
@@ -212,7 +277,15 @@ var NSButtonIsBorderedMask = 0x00800000,
 
 - (id)initWithCoder:(CPCoder)aCoder
 {
-    return [self NS_initWithCoder:aCoder];
+    self = [self NS_initWithCoder:aCoder];
+
+    if (self)
+    {
+        var cell = [aCoder decodeObjectForKey:@"NSCell"];
+        [self NS_initWithCell:cell];
+    }
+
+    return self;
 }
 
 - (Class)classForKeyedArchiver
@@ -228,11 +301,15 @@ var NSButtonIsBorderedMask = 0x00800000,
     int         _bezelStyle         @accessors(readonly, getter=bezelStyle);
 
     CPString    _title              @accessors(readonly, getter=title);
+    CPString    _alternateTitle     @accessors(readonly, getter=alternateTitle);
     CPImage     _normalImage        @accessors(readonly, getter=normalImage);
     CPImage     _alternateImage     @accessors(readonly, getter=alternateImage);
 
     BOOL        _allowsMixedState   @accessors(readonly, getter=allowsMixedState);
     BOOL        _imagePosition      @accessors(readonly, getter=imagePosition);
+
+    int         _highlightsBy       @accessors(readonly, getter=highlightsBy);
+    int         _showsStateBy       @accessors(readonly, getter=showsStateBy);
 
     CPString    _keyEquivalent      @accessors(readonly, getter=keyEquivalent);
     unsigned    _keyEquivalentModifierMask @accessors(readonly, getter=keyEquivalentModifierMask);
@@ -252,8 +329,9 @@ var NSButtonIsBorderedMask = 0x00800000,
         _isBordered = (buttonFlags & NSButtonIsBorderedMask) ? YES : NO;
         _bezelStyle = (buttonFlags2 & 0x7) | ((buttonFlags2 & 0x20) >> 2);
 
-        // NSContents for NSButton is actually the title
+        // NSContents/NSAlternateContents for NSButton is actually the title/alternate title
         _title = [aCoder decodeObjectForKey:@"NSContents"];
+        _alternateTitle = [aCoder decodeObjectForKey:@"NSAlternateContents"];
         // ... and _objectValue is _state
         _objectValue = [self state];
 
@@ -278,6 +356,26 @@ var NSButtonIsBorderedMask = 0x00800000,
             _imagePosition = CPImageAbove;
         else if ((position & NSButtonNoImagePositionMask) == NSButtonNoImagePositionMask)
             _imagePosition = CPNoImage;
+
+        _highlightsBy = CPNoCellMask;
+
+        if (buttonFlags & NSHighlightsByPushInCellMask)
+            _highlightsBy |= CPPushInCellMask;
+        if (buttonFlags & NSHighlightsByContentsCellMask)
+            _highlightsBy |= CPContentsCellMask;
+        if (buttonFlags & NSHighlightsByChangeGrayCellMask)
+            _highlightsBy |= CPChangeGrayCellMask;
+        if (buttonFlags & NSHighlightsByChangeBackgroundCellMask)
+            _highlightsBy |= CPChangeBackgroundCellMask;
+
+        _showsStateBy = CPNoCellMask;
+
+        if (buttonFlags & NSShowsStateByContentsCellMask)
+            _showsStateBy |= CPContentsCellMask;
+        if (buttonFlags & NSShowsStateByChangeGrayCellMask)
+            _showsStateBy |= CPChangeGrayCellMask;
+        if (buttonFlags & NSShowsStateByChangeBackgroundCellMask)
+            _showsStateBy |= CPChangeBackgroundCellMask;
 
         _keyEquivalent = [aCoder decodeObjectForKey:@"NSKeyEquivalent"];
         _keyEquivalentModifierMask = buttonFlags2 >> 8;

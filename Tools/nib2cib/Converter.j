@@ -20,9 +20,19 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
 */
 
-@import <Foundation/Foundation.j>
-@import <AppKit/AppKit.j>
+@import <Foundation/CPObject.j>
+@import <Foundation/CPArray.j>
+@import <Foundation/CPData.j>
+@import <Foundation/CPException.j>
+@import <Foundation/CPString.j>
 @import <BlendKit/BlendKit.j>
+
+@import "NSFoundation.j"
+@import "NSAppKit.j"
+
+@class Nib2Cib
+
+@global java
 
 var FILE = require("file"),
     OS = require("os"),
@@ -40,86 +50,82 @@ ConverterConversionException = @"ConverterConversionException";
 
 @implementation Converter : CPObject
 {
-    CPString     inputPath       @accessors(readonly);
-    CPString     outputPath      @accessors;
-    CPString     resourcesPath   @accessors;
-    NibFormat    format          @accessors(readonly);
-    CPArray      themes          @accessors(readonly);
+    CPString inputPath  @accessors(readonly);
+    CPString outputPath @accessors;
 }
 
 + (Converter)sharedConverter
 {
-    if (!SharedConverter)
-        SharedConverter = [[Converter alloc] init];
-
     return SharedConverter;
 }
 
-- (id)initWithInputPath:(CPString)aPath format:(NibFormat)nibFormat themes:(CPArray)themeList
+- (id)initWithInputPath:(CPString)anInputPath outputPath:(CPString)anOutputPath
 {
     self = [super init];
 
     if (self)
     {
-        inputPath = aPath;
-        format = nibFormat;
-        themes = themeList;
+        if (!SharedConverter)
+            SharedConverter = self;
+
+        inputPath = anInputPath;
+        outputPath = anOutputPath;
     }
 
     return self;
 }
 
-- (void)convert
+- (CPData)convert
 {
-    if ([resourcesPath length] && !FILE.isReadable(resourcesPath))
-        [CPException raise:ConverterConversionException reason:@"Could not read Resources at path \"" + resourcesPath + "\""];
+    // Assume its a Mac file.
+    var inferredFormat = NibFormatMac;
 
-    var inferredFormat = format;
+    // Some .xibs are iPhone nibs, check the actual contents in this case.
+    if (FILE.extension(inputPath) !== ".nib" && FILE.isFile(inputPath) &&
+        FILE.read(inputPath, { charset:"UTF-8" }).indexOf("<archive type=\"com.apple.InterfaceBuilder3.CocoaTouch.XIB\"") !== -1)
+        inferredFormat = NibFormatIPhone;
 
-    if (inferredFormat === NibFormatUndetermined)
-    {
-        // Assume its a Mac file.
-        inferredFormat = NibFormatMac;
+    if (inferredFormat === NibFormatMac)
+        CPLog.info("Auto-detected Cocoa nib or xib File");
+    else
+        CPLog.info("Auto-detected CocoaTouch xib File");
 
-        // Some .xibs are iPhone nibs, check the actual contents in this case.
-        if (FILE.extension(inputPath) !== ".nib" && FILE.isFile(inputPath) &&
-            FILE.read(inputPath, { charset:"UTF-8" }).indexOf("<archive type=\"com.apple.InterfaceBuilder3.CocoaTouch.XIB\"") !== -1)
-            inferredFormat = NibFormatIPhone;
-
-        if (inferredFormat === NibFormatMac)
-            CPLog.info("Auto-detected Cocoa Nib or Xib File");
-        else
-            CPLog.info("Auto-detected CocoaTouch Xib File");
-    }
+    CPLog.info("Converting xib file to plist...");
 
     var nibData = [self CPCompliantNibDataAtFilePath:inputPath];
 
     if (inferredFormat === NibFormatMac)
-        var convertedData = [self convertedDataFromMacData:nibData resourcesPath:resourcesPath];
+        var convertedData = [self convertedDataFromMacData:nibData];
     else
         [CPException raise:ConverterConversionException reason:@"nib2cib does not understand this nib format."];
 
-    if (![outputPath length])
-        outputPath = inputPath.substr(0, inputPath.length - FILE.extension(inputPath).length) + ".cib";
+    if ([outputPath length])
+        FILE.write(outputPath, [convertedData rawString], { charset:"UTF-8" });
 
-    FILE.write(outputPath, [convertedData rawString], { charset:"UTF-8" });
-    CPLog.info(CPLogColorize("Conversion successful", "warn"));
+    CPLog.info("Conversion successful");
+
+    return convertedData;
 }
 
 - (CPData)CPCompliantNibDataAtFilePath:(CPString)aFilePath
 {
-    CPLog.info("Converting Xib file to plist...");
-
     var temporaryNibFilePath = "",
         temporaryPlistFilePath = "";
 
     try
     {
-        // Compile xib or nib to make sure we have a non-new format nib.
-        temporaryNibFilePath = FILE.join("/tmp", FILE.basename(aFilePath) + ".tmp.nib");
+        if ([outputPath length])
+        {
+            // Compile xib or nib to make sure we have a non-new format nib.
+            temporaryNibFilePath = FILE.join("/tmp", FILE.basename(aFilePath) + ".tmp.nib");
 
-        if (OS.popen(["/usr/bin/ibtool", aFilePath, "--compile", temporaryNibFilePath]).wait() === 1)
-            [CPException raise:ConverterConversionException reason:@"Could not compile file: " + aFilePath];
+            if (OS.popen(["/usr/bin/ibtool", aFilePath, "--compile", temporaryNibFilePath]).wait() === 1)
+                [CPException raise:ConverterConversionException reason:@"Could not compile file: " + aFilePath];
+        }
+        else
+        {
+            temporaryNibFilePath = aFilePath;
+        }
 
         // Convert from binary plist to XML plist
         var temporaryPlistFilePath = FILE.join("/tmp", FILE.basename(aFilePath) + ".tmp.plist");
@@ -130,7 +136,7 @@ ConverterConversionException = @"ConverterConversionException";
         if (!FILE.isReadable(temporaryPlistFilePath))
             [CPException raise:ConverterConversionException reason:@"Unable to convert nib file."];
 
-        var plistContents = FILE.read(temporaryPlistFilePath, { charset:"UTF-8" });
+        var plistContents = FILE.read(temporaryPlistFilePath, { charset: "UTF-8" });
 
         // Minor NS keyed archive to CP keyed archive conversion.
         // Use Java directly because rhino's string.replace is *so slow*. 4 seconds vs. 1 millisecond.
@@ -143,7 +149,7 @@ ConverterConversionException = @"ConverterConversionException";
         plistContents = plistContents.replace(/<string>[\u0000-\u0008\u000B\u000C\u000E-\u001F]<\/string>/g, function(c)
         {
             CPLog.warn("Warning: converting character 0x" + c.charCodeAt(8).toString(16) + " to base64 representation");
-            return "<string type=\"base64\">"+CFData.encodeBase64String(c.charAt(8))+"</string>";
+            return "<string type=\"base64\">" + CFData.encodeBase64String(c.charAt(8)) + "</string>";
         });
     }
     finally
@@ -160,4 +166,4 @@ ConverterConversionException = @"ConverterConversionException";
 
 @end
 
-@import "Converter+Mac.j"
+//@import "Converter+Mac.j"

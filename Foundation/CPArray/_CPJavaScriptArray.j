@@ -19,7 +19,7 @@ var concat = Array.prototype.concat,
     return [];
 }
 
-+ (CPArray)array
++ (id)array
 {
     return [];
 }
@@ -107,7 +107,7 @@ var concat = Array.prototype.concat,
     return self;
 }
 
-- (BOOL)count
+- (CPUInteger)count
 {
     return self.length;
 }
@@ -118,6 +118,29 @@ var concat = Array.prototype.concat,
         _CPRaiseRangeException(self, _cmd, anIndex, self.length);
 
     return self[anIndex];
+}
+
+- (CPArray)objectsAtIndexes:(CPIndexSet)indexes
+{
+    if ([indexes lastIndex] >= self.length)
+        [CPException raise:CPRangeException reason:_cmd + " indexes out of bounds"];
+
+    var ranges = indexes._ranges,
+        count  = ranges.length,
+        result = [],
+        i = 0;
+
+    for (; i < count; i++)
+    {
+        var range = ranges[i],
+            loc = range.location,
+            len = range.length,
+            subArray = self.slice(loc, loc + len);
+
+        result.splice.apply(result, [result.length, 0].concat(subArray));
+    }
+
+    return result;
 }
 
 - (CPUInteger)indexOfObject:(id)anObject inRange:(CPRange)aRange
@@ -207,7 +230,7 @@ var concat = Array.prototype.concat,
     return join.call(self, aString);
 }
 
-- (void)insertObject:(id)anObject atIndex:(int)anIndex
+- (void)insertObject:(id)anObject atIndex:(CPUInteger)anIndex
 {
     if (anIndex > self.length || anIndex < 0)
         _CPRaiseRangeException(self, _cmd, anIndex, self.length);
@@ -215,12 +238,32 @@ var concat = Array.prototype.concat,
     splice.call(self, anIndex, 0, anObject);
 }
 
-- (void)removeObjectAtIndex:(int)anIndex
+- (void)removeObjectAtIndex:(CPUInteger)anIndex
 {
     if (anIndex >= self.length || anIndex < 0)
         _CPRaiseRangeException(self, _cmd, anIndex, self.length);
 
     splice.call(self, anIndex, 1);
+}
+
+- (void)removeObjectIdenticalTo:(id)anObject
+{
+    if (indexOf)
+    {
+        var anIndex;
+        while ((anIndex = indexOf.call(self, anObject)) !== -1)
+            splice.call(self, anIndex, 1);
+    }
+    else
+        [super removeObjectIdenticalTo:anObject inRange:CPMakeRange(0, self.length)];
+}
+
+- (void)removeObjectIdenticalTo:(id)anObject inRange:(CPRange)aRange
+{
+    if (indexOf && !aRange)
+        [self removeObjectIdenticalTo:anObject];
+
+    [super removeObjectIdenticalTo:anObject inRange:aRange];
 }
 
 - (void)addObject:(id)anObject
@@ -246,7 +289,7 @@ var concat = Array.prototype.concat,
     splice.call(self, aRange.location, aRange.length);
 }
 
-- (void)replaceObjectAtIndex:(int)anIndex withObject:(id)anObject
+- (void)replaceObjectAtIndex:(CPUInteger)anIndex withObject:(id)anObject
 {
     if (anIndex >= self.length || anIndex < 0)
         _CPRaiseRangeException(self, _cmd, anIndex, self.length);
@@ -290,7 +333,7 @@ var concat = Array.prototype.concat,
 }
 
 
-- (void)copy
+- (id)copy
 {
     return slice.call(self, 0);
 }

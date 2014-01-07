@@ -34,34 +34,44 @@
 
 
 /*! @ignore */
-var _isSystemUsingOverlayScrollers = function()
+var _isBrowserUsingOverlayScrollers = function()
 {
 #if PLATFORM(DOM)
-    var inner = document.createElement('p'),
-        outer = document.createElement('div');
+    /*
+        Even if the system supports overlay (Lion) scrollers,
+        the browser (e.g. FireFox *cough*) may not.
 
-    inner.style.width = "100%";
-    inner.style.height = "200px";
+        To determine if the browser is using overlay scrollbars,
+        we put a <p> element inside a shorter <div> and set its
+        overflow to scroll. If the browser is using visible scrollers,
+        the outer div's clientWidth will less than the offsetWidth, because
+        clientWidth does not include scrollbars, whereas offsetWidth does.
+        So if clientWidth === offsetWidth, the scrollers must be overlay.
+        Even IE gets this right.
+    */
+    var outer = document.createElement('div'),
+        inner = document.createElement('p');
 
+    // position it absolute so it doesn't affect existing DOM elements
     outer.style.position = "absolute";
     outer.style.top = "0px";
     outer.style.left = "0px";
     outer.style.visibility = "hidden";
     outer.style.width = "200px";
     outer.style.height = "150px";
-    outer.style.overflow = "hidden";
-    outer.appendChild (inner);
+    outer.style.overflow = "scroll";
 
-    document.body.appendChild (outer);
-    var w1 = inner.offsetWidth;
-    outer.style.overflow = 'scroll';
-    var w2 = inner.offsetWidth;
-    if (w1 == w2)
-        w2 = outer.clientWidth;
+    inner.style.width = "100%";
+    inner.style.height = "200px";
+    outer.appendChild(inner);
 
-    document.body.removeChild (outer);
+    document.body.appendChild(outer);
 
-    return (w1 - w2 == 0);
+    var usingOverlayScrollers = outer.clientWidth === outer.offsetWidth;
+
+    document.body.removeChild(outer);
+
+    return usingOverlayScrollers;
 #else
     return NO;
 #endif
@@ -125,10 +135,13 @@ var CPScrollerStyleGlobal                       = CPScrollerStyleOverlay,
 
 + (void)initialize
 {
+    if (self !== [CPScrollView class])
+        return;
+
     var globalValue = [[CPBundle mainBundle] objectForInfoDictionaryKey:@"CPScrollersGlobalStyle"];
 
-    if (globalValue == nil || globalValue == -1)
-        CPScrollerStyleGlobal = _isSystemUsingOverlayScrollers() ? CPScrollerStyleOverlay : CPScrollerStyleLegacy
+    if (globalValue === nil || globalValue === -1)
+        CPScrollerStyleGlobal = _isBrowserUsingOverlayScrollers() ? CPScrollerStyleOverlay : CPScrollerStyleLegacy
     else
         CPScrollerStyleGlobal = globalValue;
 }
@@ -140,15 +153,15 @@ var CPScrollerStyleGlobal                       = CPScrollerStyleOverlay,
 
 + (CPDictionary)themeAttributes
 {
-    return [CPDictionary dictionaryWithJSObject:{
-        @"bottom-corner-color": [CPColor whiteColor],
-        @"border-color": [CPColor blackColor]
-    }];
+    return @{
+            @"bottom-corner-color": [CPColor whiteColor],
+            @"border-color": [CPColor blackColor]
+        };
 }
 
 + (CGSize)contentSizeForFrameSize:(CGSize)frameSize hasHorizontalScroller:(BOOL)hFlag hasVerticalScroller:(BOOL)vFlag borderType:(CPBorderType)borderType
 {
-    var bounds = [self _insetBounds:_CGRectMake(0.0, 0.0, frameSize.width, frameSize.height) borderType:borderType],
+    var bounds = [self _insetBounds:CGRectMake(0.0, 0.0, frameSize.width, frameSize.height) borderType:borderType],
         scrollerWidth = [CPScroller scrollerWidth];
 
     if (hFlag)
@@ -162,17 +175,17 @@ var CPScrollerStyleGlobal                       = CPScrollerStyleOverlay,
 
 + (CGSize)frameSizeForContentSize:(CGSize)contentSize hasHorizontalScroller:(BOOL)hFlag hasVerticalScroller:(BOOL)vFlag borderType:(CPBorderType)borderType
 {
-    var bounds = [self _insetBounds:_CGRectMake(0.0, 0.0, contentSize.width, contentSize.height) borderType:borderType],
+    var bounds = [self _insetBounds:CGRectMake(0.0, 0.0, contentSize.width, contentSize.height) borderType:borderType],
         widthInset = contentSize.width - bounds.size.width,
         heightInset = contentSize.height - bounds.size.height,
-        frameSize = _CGSizeMake(contentSize.width + widthInset, contentSize.height + heightInset),
+        frameSize = CGSizeMake(contentSize.width + widthInset, contentSize.height + heightInset),
         scrollerWidth = [CPScroller scrollerWidth];
 
     if (hFlag)
-        frameSize.height -= scrollerWidth;
+        frameSize.height += scrollerWidth;
 
     if (vFlag)
-        frameSize.width -= scrollerWidth;
+        frameSize.width += scrollerWidth;
 
     return frameSize;
 }
@@ -183,10 +196,10 @@ var CPScrollerStyleGlobal                       = CPScrollerStyleOverlay,
     {
         case CPLineBorder:
         case CPBezelBorder:
-            return _CGRectInset(bounds, 1.0, 1.0);
+            return CGRectInset(bounds, 1.0, 1.0);
 
         case CPGrooveBorder:
-            bounds = _CGRectInset(bounds, 2.0, 2.0);
+            bounds = CGRectInset(bounds, 2.0, 2.0);
             ++bounds.origin.y;
             --bounds.size.height;
             return bounds;
@@ -210,7 +223,7 @@ var CPScrollerStyleGlobal                       = CPScrollerStyleOverlay,
 
     @param aStyle the scroller style to set all scroller views to use (CPScrollerStyleLegacy or CPScrollerStyleOverlay)
 */
-+ (int)setGlobalScrollerStyle:(int)aStyle
++ (void)setGlobalScrollerStyle:(int)aStyle
 {
     CPScrollerStyleGlobal = aStyle;
     [[CPNotificationCenter defaultCenter] postNotificationName:CPScrollerStyleGlobalChangeNotification object:nil];
@@ -514,8 +527,8 @@ Notifies the delegate when the scroll view has finished scrolling.
     {
         var bounds = [self _insetBounds];
 
-        [self setHorizontalScroller:[[CPScroller alloc] initWithFrame:CGRectMake(0.0, 0.0, MAX(_CGRectGetWidth(bounds), [CPScroller scrollerWidthInStyle:_scrollerStyle] + 1), [CPScroller scrollerWidthInStyle:_scrollerStyle])]];
-        [[self horizontalScroller] setFrameSize:CGSizeMake(_CGRectGetWidth(bounds), [CPScroller scrollerWidthInStyle:_scrollerStyle])];
+        [self setHorizontalScroller:[[CPScroller alloc] initWithFrame:CGRectMake(0.0, 0.0, MAX(CGRectGetWidth(bounds), [CPScroller scrollerWidthInStyle:_scrollerStyle] + 1), [CPScroller scrollerWidthInStyle:_scrollerStyle])]];
+        [[self horizontalScroller] setFrameSize:CGSizeMake(CGRectGetWidth(bounds), [CPScroller scrollerWidthInStyle:_scrollerStyle])];
     }
 
     [self reflectScrolledClipView:_contentView];
@@ -579,8 +592,8 @@ Notifies the delegate when the scroll view has finished scrolling.
     {
         var bounds = [self _insetBounds];
 
-        [self setVerticalScroller:[[CPScroller alloc] initWithFrame:_CGRectMake(0.0, 0.0, [CPScroller scrollerWidthInStyle:_scrollerStyle], MAX(_CGRectGetHeight(bounds), [CPScroller scrollerWidthInStyle:_scrollerStyle] + 1))]];
-        [[self verticalScroller] setFrameSize:CGSizeMake([CPScroller scrollerWidthInStyle:_scrollerStyle], _CGRectGetHeight(bounds))];
+        [self setVerticalScroller:[[CPScroller alloc] initWithFrame:CGRectMake(0.0, 0.0, [CPScroller scrollerWidthInStyle:_scrollerStyle], MAX(CGRectGetHeight(bounds), [CPScroller scrollerWidthInStyle:_scrollerStyle] + 1))]];
+        [[self verticalScroller] setFrameSize:CGSizeMake([CPScroller scrollerWidthInStyle:_scrollerStyle], CGRectGetHeight(bounds))];
     }
 
     [self reflectScrolledClipView:_contentView];
@@ -751,35 +764,42 @@ Notifies the delegate when the scroll view has finished scrolling.
     {
         [_horizontalScroller setStyle:_scrollerStyle];
         [_horizontalScroller unsetThemeState:CPThemeStateSelected];
+
         switch (_scrollerKnobStyle)
         {
             case CPScrollerKnobStyleLight:
                 [_horizontalScroller unsetThemeState:CPThemeStateScrollerKnobDark];
                 [_horizontalScroller setThemeState:CPThemeStateScrollerKnobLight];
                 break;
+
             case CPScrollerKnobStyleDark:
                 [_horizontalScroller unsetThemeState:CPThemeStateScrollerKnobLight];
                 [_horizontalScroller setThemeState:CPThemeStateScrollerKnobDark];
                 break;
+
             default:
                 [_horizontalScroller unsetThemeState:CPThemeStateScrollerKnobLight];
                 [_horizontalScroller unsetThemeState:CPThemeStateScrollerKnobDark];
         }
     }
+
     if (_hasVerticalScroller)
     {
         [_verticalScroller setStyle:_scrollerStyle];
         [_verticalScroller unsetThemeState:CPThemeStateSelected];
+
         switch (_scrollerKnobStyle)
         {
             case CPScrollerKnobStyleLight:
                 [_verticalScroller unsetThemeState:CPThemeStateScrollerKnobDark];
                 [_verticalScroller setThemeState:CPThemeStateScrollerKnobLight];
                 break;
+
             case CPScrollerKnobStyleDark:
                 [_verticalScroller unsetThemeState:CPThemeStateScrollerKnobLight];
                 [_verticalScroller setThemeState:CPThemeStateScrollerKnobDark];
                 break;
+
             default:
                 [_verticalScroller unsetThemeState:CPThemeStateScrollerKnobLight];
                 [_verticalScroller unsetThemeState:CPThemeStateScrollerKnobDark];
@@ -790,6 +810,7 @@ Notifies the delegate when the scroll view has finished scrolling.
     {
         if (_timerScrollersHide)
             [_timerScrollersHide invalidate];
+
         _timerScrollersHide = [CPTimer scheduledTimerWithTimeInterval:CPScrollViewFadeOutTime target:self selector:@selector(_hideScrollers:) userInfo:nil repeats:NO];
         [[self bottomCornerView] setHidden:YES];
     }
@@ -848,13 +869,13 @@ Notifies the delegate when the scroll view has finished scrolling.
 - (CGRect)_cornerViewFrame
 {
     if (!_cornerView)
-        return _CGRectMakeZero();
+        return CGRectMakeZero();
 
     var bounds = [self _insetBounds],
         frame = [_cornerView frame];
 
-    frame.origin.x = _CGRectGetMaxX(bounds) - _CGRectGetWidth(frame);
-    frame.origin.y = _CGRectGetMinY(bounds);
+    frame.origin.x = CGRectGetMaxX(bounds) - CGRectGetWidth(frame);
+    frame.origin.y = CGRectGetMinY(bounds);
 
     return frame;
 }
@@ -865,13 +886,14 @@ Notifies the delegate when the scroll view has finished scrolling.
     var headerView = [self _headerView];
 
     if (!headerView)
-        return _CGRectMakeZero();
+        return CGRectMakeZero();
 
     var frame = [self _insetBounds];
 
-    frame.size.height = _CGRectGetHeight([headerView frame]);
+    frame.size.height = CGRectGetHeight([headerView frame]);
+
     if (SHOULD_SHOW_CORNER_VIEW())
-        frame.size.width -= _CGRectGetWidth([self _cornerViewFrame]);
+        frame.size.width -= CGRectGetWidth([self _cornerViewFrame]);
 
     return frame;
 }
@@ -912,18 +934,18 @@ Notifies the delegate when the scroll view has finished scrolling.
             break;
 
         case CPScrollerDecrementPage:
-            contentBounds.origin.y -= _CGRectGetHeight(contentBounds) - _verticalPageScroll;
+            contentBounds.origin.y -= CGRectGetHeight(contentBounds) - _verticalPageScroll;
             break;
 
         case CPScrollerIncrementPage:
-            contentBounds.origin.y += _CGRectGetHeight(contentBounds) - _verticalPageScroll;
+            contentBounds.origin.y += CGRectGetHeight(contentBounds) - _verticalPageScroll;
             break;
 
         // We want integral bounds!
         case CPScrollerKnobSlot:
         case CPScrollerKnob:
         default:
-            contentBounds.origin.y = ROUND(value * (_CGRectGetHeight(documentFrame) - _CGRectGetHeight(contentBounds)));
+            contentBounds.origin.y = ROUND(value * (CGRectGetHeight(documentFrame) - CGRectGetHeight(contentBounds)));
     }
 
     [self _sendDelegateMessages];
@@ -949,18 +971,18 @@ Notifies the delegate when the scroll view has finished scrolling.
             break;
 
         case CPScrollerDecrementPage:
-            contentBounds.origin.x -= _CGRectGetWidth(contentBounds) - _horizontalPageScroll;
+            contentBounds.origin.x -= CGRectGetWidth(contentBounds) - _horizontalPageScroll;
             break;
 
         case CPScrollerIncrementPage:
-            contentBounds.origin.x += _CGRectGetWidth(contentBounds) - _horizontalPageScroll;
+            contentBounds.origin.x += CGRectGetWidth(contentBounds) - _horizontalPageScroll;
             break;
 
         // We want integral bounds!
         case CPScrollerKnobSlot:
         case CPScrollerKnob:
         default:
-            contentBounds.origin.x = ROUND(value * (_CGRectGetWidth(documentFrame) - _CGRectGetWidth(contentBounds)));
+            contentBounds.origin.x = ROUND(value * (CGRectGetWidth(documentFrame) - CGRectGetWidth(contentBounds)));
     }
 
     [self _sendDelegateMessages];
@@ -1084,7 +1106,7 @@ Notifies the delegate when the scroll view has finished scrolling.
         }
 
         [_contentView setFrame:[self _insetBounds]];
-        [_headerClipView setFrame:_CGRectMakeZero()];
+        [_headerClipView setFrame:CGRectMakeZero()];
 
         --_recursionCount;
 
@@ -1094,14 +1116,14 @@ Notifies the delegate when the scroll view has finished scrolling.
     var documentFrame = [documentView frame], // the size of the whole document
         contentFrame = [self _insetBounds], // assume it takes up the entire size of the scrollview (no scrollers)
         headerClipViewFrame = [self _headerClipViewFrame],
-        headerClipViewHeight = _CGRectGetHeight(headerClipViewFrame);
+        headerClipViewHeight = CGRectGetHeight(headerClipViewFrame);
 
     contentFrame.origin.y += headerClipViewHeight;
     contentFrame.size.height -= headerClipViewHeight;
 
-    var difference = _CGSizeMake(_CGRectGetWidth(documentFrame) - _CGRectGetWidth(contentFrame), _CGRectGetHeight(documentFrame) - _CGRectGetHeight(contentFrame)),
-        verticalScrollerWidth = _CGRectGetWidth([_verticalScroller frame]),
-        horizontalScrollerHeight = _CGRectGetHeight([_horizontalScroller frame]),
+    var difference = CGSizeMake(CGRectGetWidth(documentFrame) - CGRectGetWidth(contentFrame), CGRectGetHeight(documentFrame) - CGRectGetHeight(contentFrame)),
+        verticalScrollerWidth = [CPScroller scrollerWidthInStyle:[_verticalScroller style]],
+        horizontalScrollerHeight = [CPScroller scrollerWidthInStyle:[_horizontalScroller style]],
         hasVerticalScroll = difference.height > 0.0,
         hasHorizontalScroll = difference.width > 0.0,
         shouldShowVerticalScroller = _hasVerticalScroller && (!_autohidesScrollers || hasVerticalScroll),
@@ -1150,18 +1172,18 @@ Notifies the delegate when the scroll view has finished scrolling.
     if (shouldShowVerticalScroller)
     {
         var verticalScrollerY =
-            MAX(_CGRectGetMinY(contentFrame), MAX(_CGRectGetMaxY([self _cornerViewFrame]), _CGRectGetMaxY(headerClipViewFrame)));
+            MAX(CGRectGetMinY(contentFrame), MAX(CGRectGetMaxY([self _cornerViewFrame]), CGRectGetMaxY(headerClipViewFrame)));
 
-        var verticalScrollerHeight = _CGRectGetMaxY(contentFrame) - verticalScrollerY;
+        var verticalScrollerHeight = CGRectGetMaxY(contentFrame) - verticalScrollerY;
 
         // Make a gap at the bottom of the vertical scroller so that the horizontal and vertical can't overlap.
         if (_scrollerStyle === CPScrollerStyleOverlay && hasHorizontalScroll)
             verticalScrollerHeight -= horizontalScrollerHeight;
 
-        var documentHeight = _CGRectGetHeight(documentFrame);
+        var documentHeight = CGRectGetHeight(documentFrame);
         [_verticalScroller setFloatValue:(difference.height <= 0.0) ? 0.0 : scrollPoint.y / difference.height];
-        [_verticalScroller setKnobProportion:documentHeight > 0 ? _CGRectGetHeight(contentFrame) / documentHeight : 1.0];
-        [_verticalScroller setFrame:_CGRectMake(_CGRectGetMaxX(contentFrame) - overlay, verticalScrollerY, verticalScrollerWidth, verticalScrollerHeight)];
+        [_verticalScroller setKnobProportion:documentHeight > 0 ? CGRectGetHeight(contentFrame) / documentHeight : 1.0];
+        [_verticalScroller setFrame:CGRectMake(CGRectGetMaxX(contentFrame) - overlay, verticalScrollerY, verticalScrollerWidth, verticalScrollerHeight)];
     }
     else if (wasShowingVerticalScroller)
     {
@@ -1171,16 +1193,16 @@ Notifies the delegate when the scroll view has finished scrolling.
 
     if (shouldShowHorizontalScroller)
     {
-        var horizontalScrollerWidth = _CGRectGetWidth(contentFrame);
+        var horizontalScrollerWidth = CGRectGetWidth(contentFrame);
         // Make a gap at the bottom of the vertical scroller so that the horizontal and vertical can't overlap.
         if (_scrollerStyle === CPScrollerStyleOverlay && hasVerticalScroll)
             horizontalScrollerWidth -= verticalScrollerWidth;
 
-        var documentWidth = _CGRectGetWidth(documentFrame);
+        var documentWidth = CGRectGetWidth(documentFrame);
 
         [_horizontalScroller setFloatValue:(difference.width <= 0.0) ? 0.0 : scrollPoint.x / difference.width];
-        [_horizontalScroller setKnobProportion:documentWidth > 0 ? _CGRectGetWidth(contentFrame) / documentWidth : 1.0];
-        [_horizontalScroller setFrame:_CGRectMake(_CGRectGetMinX(contentFrame), _CGRectGetMaxY(contentFrame) - overlay, horizontalScrollerWidth, horizontalScrollerHeight)];
+        [_horizontalScroller setKnobProportion:documentWidth > 0 ? CGRectGetWidth(contentFrame) / documentWidth : 1.0];
+        [_horizontalScroller setFrame:CGRectMake(CGRectGetMinX(contentFrame), CGRectGetMaxY(contentFrame) - overlay, horizontalScrollerWidth, horizontalScrollerHeight)];
     }
     else if (wasShowingHorizontalScroller)
     {
@@ -1230,6 +1252,7 @@ Notifies the delegate when the scroll view has finished scrolling.
 
     if (_timerScrollersHide)
         [_timerScrollersHide invalidate]
+
     _timerScrollersHide = [CPTimer scheduledTimerWithTimeInterval:CPScrollViewFadeOutTime target:self selector:@selector(_hideScrollers:) userInfo:nil repeats:NO];
 }
 
@@ -1243,7 +1266,7 @@ Notifies the delegate when the scroll view has finished scrolling.
 #pragma mark -
 #pragma mark Overrides
 
-- (void)drawRect:(CPRect)aRect
+- (void)drawRect:(CGRect)aRect
 {
     [super drawRect:aRect];
 
@@ -1259,7 +1282,7 @@ Notifies the delegate when the scroll view has finished scrolling.
     {
         case CPLineBorder:
             CGContextSetStrokeColor(context, [self currentValueForThemeAttribute:@"border-color"]);
-            CGContextStrokeRect(context, _CGRectInset(strokeRect, 0.5, 0.5));
+            CGContextStrokeRect(context, CGRectInset(strokeRect, 0.5, 0.5));
             break;
 
         case CPBezelBorder:
@@ -1277,10 +1300,10 @@ Notifies the delegate when the scroll view has finished scrolling.
 
 - (void)_drawGrayBezelInContext:(CGContext)context bounds:(CGRect)aRect
 {
-    var minX = _CGRectGetMinX(aRect),
-        maxX = _CGRectGetMaxX(aRect),
-        minY = _CGRectGetMinY(aRect),
-        maxY = _CGRectGetMaxY(aRect),
+    var minX = CGRectGetMinX(aRect),
+        maxX = CGRectGetMaxX(aRect),
+        minY = CGRectGetMinY(aRect),
+        maxY = CGRectGetMaxY(aRect),
         y = minY + 0.5;
 
     // Slightly darker line on top.
@@ -1311,10 +1334,10 @@ Notifies the delegate when the scroll view has finished scrolling.
 
 - (void)_drawGrooveInContext:(CGContext)context bounds:(CGRect)aRect
 {
-    var minX = _CGRectGetMinX(aRect),
-        maxX = _CGRectGetMaxX(aRect),
-        minY = _CGRectGetMinY(aRect),
-        maxY = _CGRectGetMaxY(aRect);
+    var minX = CGRectGetMinX(aRect),
+        maxX = CGRectGetMaxX(aRect),
+        minY = CGRectGetMinY(aRect),
+        maxY = CGRectGetMaxY(aRect);
 
     CGContextBeginPath(context);
     CGContextSetStrokeColor(context, [CPColor colorWithWhite:159.0 / 255.0 alpha:1.0]);
@@ -1344,11 +1367,11 @@ Notifies the delegate when the scroll view has finished scrolling.
     CGContextBeginPath(context);
     CGContextSetStrokeColor(context, [CPColor whiteColor]);
 
-    var rect = _CGRectOffset(aRect, 1.0, 1.0);
+    var rect = CGRectOffset(aRect, 1.0, 1.0);
 
     rect.size.width -= 1.0;
     rect.size.height -= 1.0;
-    CGContextStrokeRect(context, _CGRectInset(rect, 0.5, 0.5));
+    CGContextStrokeRect(context, CGRectInset(rect, 0.5, 0.5));
 
     CGContextBeginPath(context);
     CGContextSetStrokeColor(context, [CPColor colorWithWhite:192.0 / 255.0 alpha:1.0]);
@@ -1382,29 +1405,29 @@ Notifies the delegate when the scroll view has finished scrolling.
 - (void)scrollPageUp:(id)sender
 {
     var contentBounds = [_contentView bounds];
-    [self moveByOffset:CGSizeMake(0.0, -(_CGRectGetHeight(contentBounds) - _verticalPageScroll))];
+    [self moveByOffset:CGSizeMake(0.0, -(CGRectGetHeight(contentBounds) - _verticalPageScroll))];
 }
 
 - (void)scrollPageDown:(id)sender
 {
     var contentBounds = [_contentView bounds];
-    [self moveByOffset:CGSizeMake(0.0, _CGRectGetHeight(contentBounds) - _verticalPageScroll)];
+    [self moveByOffset:CGSizeMake(0.0, CGRectGetHeight(contentBounds) - _verticalPageScroll)];
 }
 
 - (void)scrollToBeginningOfDocument:(id)sender
 {
-    [_contentView scrollToPoint:_CGPointMakeZero()];
-    [_headerClipView scrollToPoint:_CGPointMakeZero()];
+    [_contentView scrollToPoint:CGPointMakeZero()];
+    [_headerClipView scrollToPoint:CGPointMakeZero()];
 }
 
 - (void)scrollToEndOfDocument:(id)sender
 {
     var contentBounds = [_contentView bounds],
         documentFrame = [[self documentView] frame],
-        scrollPoint = _CGPointMake(0.0, _CGRectGetHeight(documentFrame) - _CGRectGetHeight(contentBounds));
+        scrollPoint = CGPointMake(0.0, CGRectGetHeight(documentFrame) - CGRectGetHeight(contentBounds));
 
     [_contentView scrollToPoint:scrollPoint];
-    [_headerClipView scrollToPoint:_CGPointMakeZero()];
+    [_headerClipView scrollToPoint:CGPointMakeZero()];
 }
 
 - (void)moveLeft:(id)sender
@@ -1496,19 +1519,25 @@ var CPScrollViewContentViewKey          = @"CPScrollViewContentView",
         _scrollTimer = nil;
         _implementedDelegateMethods = 0;
 
-        // Due to the anything goes nature of decoding, our subviews may not exist yet, so layout at the end of the run loop when we're sure everything is in a correct state.
-        [[CPRunLoop currentRunLoop] performSelector:@selector(_updateCornerAndHeaderView) target:self argument:_contentView order:0 modes:[CPDefaultRunLoopMode]];
-
-        [self setScrollerStyle:[aCoder decodeIntForKey:CPScrollViewScrollerStyleKey] || CPScrollerStyleGlobal];
-        [self setScrollerKnobStyle:[aCoder decodeIntForKey:CPScrollViewScrollerKnobStyleKey] || CPScrollerKnobStyleDefault];
+        _scrollerStyle = [aCoder decodeObjectForKey:CPScrollViewScrollerStyleKey] || CPScrollerStyleGlobal;
+        _scrollerKnobStyle = [aCoder decodeObjectForKey:CPScrollViewScrollerKnobStyleKey] || CPScrollerKnobStyleDefault;
 
         [[CPNotificationCenter defaultCenter] addObserver:self
-                                 selector:@selector(_didReceiveDefaultStyleChange:)
-                                     name:CPScrollerStyleGlobalChangeNotification
-                                   object:nil];
+                                                 selector:@selector(_didReceiveDefaultStyleChange:)
+                                                     name:CPScrollerStyleGlobalChangeNotification
+                                                   object:nil];
     }
 
     return self;
+}
+
+/*!
+    Do final init that can only be done when we are sure all subviews have been initialized.
+*/
+- (void)awakeFromCib
+{
+    [self _updateScrollerStyle];
+    [self _updateCornerAndHeaderView];
 }
 
 - (void)encodeWithCoder:(CPCoder)aCoder

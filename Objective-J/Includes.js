@@ -28,6 +28,7 @@
 
 #define GLOBAL(name) name
 
+#include "OldBrowserCompatibility.js"
 #include "DebugOptions.js"
 #include "json2.js"
 #include "sprintf.js"
@@ -43,6 +44,9 @@
 #include "CFBundle.js"
 #include "StaticResource.js"
 #include "Preprocessor.js"
+#include "acorn.js"
+#include "acornwalk.js"
+#include "ObjJAcornCompiler.js"
 #include "FileDependency.js"
 #include "Executable.js"
 #include "FileExecutable.js"

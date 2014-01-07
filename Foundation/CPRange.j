@@ -34,18 +34,7 @@
 */
 function CPMakeRange(location, length)
 {
-    return { location: location, length: length };
-}
-
-/*!
-    Makes a copy of a CPRange.
-    @param aRange the CPRange to copy
-    @group CPRange
-    @return CPRange the copy of the range
-*/
-function CPCopyRange(aRange)
-{
-    return { location: aRange.location, length: aRange.length };
+    return { location:location, length:length };
 }
 
 /*!
@@ -101,7 +90,7 @@ function CPEqualRanges(lhsRange, rhsRange)
 */
 function CPLocationInRange(aLocation, aRange)
 {
-    return (aLocation >= aRange.location) && (aLocation < CPMaxRange(aRange));
+    return ((aLocation >= aRange.location) && (aLocation < CPMaxRange(aRange)));
 }
 
 /*!

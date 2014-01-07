@@ -61,7 +61,48 @@ CPLog(@"Got some class: %@", inst);
 
     @todo document KVC usage.
 */
-@implementation CPObject
+
+@class CPString
+@class CPException
+
+@global CPInvalidArgumentException
+
+
+@protocol CPObject
+
+- (BOOL)isEqual:(id)object;
+- (CPUInteger)hash;
+
+- (Class)superclass;
+- (Class)class;
+- (id)self;
+
+- (id)performSelector:(SEL)aSelector;
+- (id)performSelector:(SEL)aSelector withObject:(id)object;
+- (id)performSelector:(SEL)aSelector withObject:(id)object1 withObject:(id)object2;
+
+- (BOOL)isProxy;
+
+- (BOOL)isKindOfClass:(Class)aClass;
+- (BOOL)isMemberOfClass:(Class)aClass;
+- (BOOL)conformsToProtocol:(Protocol)aProtocol;
+
+- (BOOL)respondsToSelector:(SEL)aSelector;
+
+- (CPString)description;
+@optional
+- (CPString)debugDescription;
+
+@end
+
+@protocol CPCoding
+
+- (void)encodeWithCoder:(CPCoder)aCoder;
+- (id)initWithCoder:(CPCoder)aDecoder;
+
+@end
+
+@implementation CPObject <CPObject>
 {
     Class   isa;
 }
@@ -154,7 +195,7 @@ CPLog(@"Got some class: %@", inst);
 */
 + (Class)superclass
 {
-    return super_class;
+    return self.super_class;
 }
 
 /*!
@@ -248,6 +289,26 @@ CPLog(@"Got some class: %@", inst);
     return NO;
 }
 
+/*!
+    Test whether instances of this class conforms to the provided protocol.
+    @param aProtocol the protocol for which to test the class
+    @return \c YES if instances of the class conforms to the protocol
+*/
++ (BOOL)conformsToProtocol:(Protocol)aProtocol
+{
+    return class_conformsToProtocol(self, aProtocol);
+}
+
+/*!
+    Tests whether the receiver conforms to the provided protocol.
+    @param protocol the protocol for which to test the class
+    @return \c YES if instances of the class conforms to the protocol
+*/
+- (BOOL)conformsToProtocol:(Protocol)aProtocol
+{
+    return class_conformsToProtocol(isa, aProtocol);
+}
+
 // Obtaining method information
 
 /*!
@@ -292,7 +353,7 @@ CPLog(@"Got some class: %@", inst);
 
 + (CPString)description
 {
-    return class_getName(isa);
+    return class_getName(self.isa);
 }
 
 // Sending Messages
@@ -484,7 +545,7 @@ CPLog(@"Got some class: %@", inst);
     if (typeof self._UID === "undefined")
         self._UID = objj_generateObjectUID();
 
-    return _UID + "";
+    return self._UID + "";
 }
 
 /*!
@@ -529,3 +590,74 @@ CPLog(@"Got some class: %@", inst);
 }
 
 @end
+
+function CPDescriptionOfObject(anObject, maximumRecursionDepth)
+{
+    if (anObject === nil)
+        return "nil";
+
+    if (anObject === undefined)
+        return "undefined";
+
+    if (anObject === window)
+        return "window";
+
+    if (maximumRecursionDepth === 0)
+        return "...";
+
+    if (anObject.isa)
+    {
+        if ([anObject isKindOfClass:CPString])
+            return '@"' + [anObject description] + '"';
+
+        if ([anObject respondsToSelector:@selector(_descriptionWithMaximumDepth:)])
+            return [anObject _descriptionWithMaximumDepth:maximumRecursionDepth !== undefined ? maximumRecursionDepth - 1 : maximumRecursionDepth];
+
+        return [anObject description];
+    }
+
+    if (typeof(anObject) !== "object")
+        return String(anObject);
+
+    var properties = [],
+        desc;
+
+    for (var property in anObject)
+        if (anObject.hasOwnProperty(property))
+            properties.push(property);
+
+    properties.sort();
+
+    if (properties.length === 2 && anObject.hasOwnProperty("width") && anObject.hasOwnProperty("height"))
+        desc = [CPString stringWithFormat:@"CGSize: (%f, %f)", anObject.width, anObject.height];
+    else if (properties.length === 2 && anObject.hasOwnProperty("x") && anObject.hasOwnProperty("y"))
+        desc = [CPString stringWithFormat:@"CGPoint: (%f, %f)", anObject.x, anObject.y];
+    else if (properties.length === 2 && anObject.hasOwnProperty("origin") && anObject.hasOwnProperty("size"))
+        desc = [CPString stringWithFormat:@"CGRect: (%f, %f), (%f, %f)", anObject.origin.x, anObject.origin.y, anObject.size.width, anObject.size.height];
+    else if (properties.length === 4 && anObject.hasOwnProperty("top") && anObject.hasOwnProperty("right") && anObject.hasOwnProperty("bottom") && anObject.hasOwnProperty("left"))
+        desc = [CPString stringWithFormat:@"CGInset: { top:%f, right:%f, bottom:%f, left:%f }", anObject.top, anObject.right, anObject.bottom, anObject.left];
+    else
+    {
+        desc = "{";
+
+        for (var i = 0; i < properties.length; ++i)
+        {
+            if (i === 0)
+                desc += "\n";
+
+            var value = anObject[properties[i]],
+                valueDescription = CPDescriptionOfObject(value, maximumRecursionDepth !== undefined ? maximumRecursionDepth - 1 : maximumRecursionDepth).split("\n").join("\n    ");
+
+            desc += "    " + properties[i] + ": " + valueDescription;
+
+            if (i < properties.length - 1)
+                desc += ",\n";
+            else
+                desc += "\n";
+        }
+
+        desc += "}";
+    }
+
+    return desc;
+}

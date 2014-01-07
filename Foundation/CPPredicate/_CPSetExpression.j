@@ -20,8 +20,8 @@
  */
 
 @import "CPException.j"
-@import "CPExpression.j"
 @import "CPSet.j"
+@import "_CPExpression.j"
 
 @implementation _CPSetExpression : CPExpression
 {
@@ -47,7 +47,7 @@
     if (self === object)
         return YES;
 
-    if (object.isa !== self.isa || ![[object leftExpression] isEqual:_left] || ![[object rightExpression] isEqual:_right])
+    if (object === nil || object.isa !== self.isa || ![[object leftExpression] isEqual:_left] || ![[object rightExpression] isEqual:_right])
         return NO;
 
     return YES;

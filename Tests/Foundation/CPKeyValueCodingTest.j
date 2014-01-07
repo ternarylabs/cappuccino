@@ -454,14 +454,14 @@ var accessIVARS = YES;
 
 - (void)testIfValueForKeyAccessesObjectForKey
 {
-    var testDictionary = [CPDictionary dictionary];
+    var testDictionary = @{};
     [testDictionary setObject:kvcTestObject forKey:@"testKey"];
     [self assert: kvcTestObject same: [testDictionary valueForKey: @"testKey"]];
 }
 
 - (void)testIfSetValueForKeyModifiesObjectForKey
 {
-    var testDictionary = [CPDictionary dictionary];
+    var testDictionary = @{};
     [testDictionary setValue:kvcTestObject forKey:@"testKey"];
     [self assert: kvcTestObject same: [testDictionary objectForKey: @"testKey"]];
 }
@@ -480,8 +480,8 @@ var accessIVARS = YES;
 
 - (void)testValueForKeyPath
 {
-    var department = [Department departmentWithName:@"Engineering"],
-        employee = [Employee employeeWithName:@"Klaas Pieter" department:department];
+    var department = [Department2 departmentWithName:@"Engineering"],
+        employee = [Employee2 employeeWithName:@"Klaas Pieter" department:department];
 
     [self assert:department equals:[employee valueForKey:@"department"]];
     [self assert:@"Engineering" equals:[employee valueForKeyPath:@"department.name"]];
@@ -489,10 +489,55 @@ var accessIVARS = YES;
 
 @end
 
-@implementation Employee : CPObject
+// CPValue unwrapping (AKA Wrapping and Unwrapping Structs)
+
+@implementation CPKeyValueCodingTest (CPValueUnwrapping)
+
+- (void)testIfCPValueIsUnwrapped
+{
+    [KVCTestClass setAccessInstanceVariablesDirectly: YES];
+
+    var values = @[
+            [CPValue valueWithJSObject:CGPointMake(200, -100)],
+            [CPValue valueWithJSObject:CGSizeMake(100, 100)],
+            [CPValue valueWithJSObject:CGRectMake(100, 100, 50, 150)],
+        ];
+
+    for (var i = 0; i < values.length; i++)
+    {
+        var value = values[i];
+
+        [kvcTestObject setValue:value forKey:"privatePropertyWithoutAccessors"];
+        [kvcTestObject setValue:value forKey:"publicPropertyWithoutAccessors"];
+        [kvcTestObject setValue:value forKey:"privateBoolPropertyWithoutAccessors"];
+        [kvcTestObject setValue:value forKey:"publicBoolPropertyWithoutAccessors"];
+        [kvcTestObject setValue:value forKey:"propertyWithPublicAccessor"];
+        [kvcTestObject setValue:value forKey:"propertyWithPrivateAccessor"];
+
+        var allKeys = ["privatePropertyWithoutAccessors","publicPropertyWithoutAccessors",
+                        "privateBoolPropertyWithoutAccessors","publicBoolPropertyWithoutAccessors",
+                        "propertyWithPublicAccessor", "propertyWithPrivateAccessor"
+                       ],
+            dictForKeys = [kvcTestObject dictionaryWithValuesForKeys:allKeys],
+            key,
+            readBackValue,
+            keyEnumerator = [dictForKeys keyEnumerator];
+
+        while ((key = [keyEnumerator nextObject]) !== nil)
+        {
+            readBackValue = [dictForKeys objectForKey:key];
+            [self assertFalse:readBackValue.isa message:"Expected to read back an unwrapped value, not " + readBackValue + "."];
+            [self assert:JSON.stringify([value JSObject]) equals:JSON.stringify(readBackValue)];
+        }
+    }
+}
+
+@end
+
+@implementation Employee2 : CPObject
 {
     CPString                    _name @accessors(property=name);
-    Department                  _department @accessors(property=department);
+    Department2                 _department @accessors(property=department);
 }
 
 + (id)employeeWithName:(CPString)theName department:(Department)theDepartment
@@ -513,7 +558,7 @@ var accessIVARS = YES;
 
 @end
 
-@implementation Department : CPObject
+@implementation Department2 : CPObject
 {
     CPString                _name @accessors(property=name);
 }

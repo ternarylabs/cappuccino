@@ -33,8 +33,8 @@ CPUndefinedKeyException     = @"CPUndefinedKeyException";
 CPTargetObjectUserInfoKey   = @"CPTargetObjectUserInfoKey";
 CPUnknownUserInfoKey        = @"CPUnknownUserInfoKey";
 
-var CPObjectAccessorsForClassKey            = @"$CPObjectAccessorsForClassKey",
-    CPObjectModifiersForClassKey            = @"$CPObjectModifiersForClassKey";
+var CPObjectAccessorsForClassKey = @"$CPObjectAccessorsForClassKey",
+    CPObjectModifiersForClassKey = @"$CPObjectModifiersForClassKey";
 
 @implementation CPObject (CPKeyValueCoding)
 
@@ -107,13 +107,20 @@ var CPObjectAccessorsForClassKey            = @"$CPObjectAccessorsForClassKey",
 
     switch (accessor[0])
     {
-        case 0:     return objj_msgSend(self, accessor[1]);
-                    // FIXME: We shouldn't be creating a new one every time.
-        case 1:     return [[_CPKeyValueCodingArray alloc] initWithTarget:self key:aKey];
-                    // FIXME: We shouldn't be creating a new one every time.
-        case 2:     return [[_CPKeyValueCodingSet alloc] initWithTarget:self key:aKey];
-        case 3:     if ([theClass accessInstanceVariablesDirectly])
-                        return self[accessor[1]];
+        case 0:
+            return objj_msgSend(self, accessor[1]);
+
+        case 1:
+            // FIXME: We shouldn't be creating a new one every time.
+            return [[_CPKeyValueCodingArray alloc] initWithTarget:self key:aKey];
+
+        case 2:
+            // FIXME: We shouldn't be creating a new one every time.
+            return [[_CPKeyValueCodingSet alloc] initWithTarget:self key:aKey];
+
+        case 3:
+            if ([theClass accessInstanceVariablesDirectly])
+                return self[accessor[1]];
     }
 
     return [self valueForUndefinedKey:aKey];
@@ -137,7 +144,7 @@ var CPObjectAccessorsForClassKey            = @"$CPObjectAccessorsForClassKey",
 {
     var index = 0,
         count = keys.length,
-        dictionary = [CPDictionary dictionary];
+        dictionary = @{};
 
     for (; index < count; ++index)
     {
@@ -158,7 +165,7 @@ var CPObjectAccessorsForClassKey            = @"$CPObjectAccessorsForClassKey",
 {
     [[CPException exceptionWithName:CPUndefinedKeyException
                             reason:[self _objectDescription] + " is not key value coding-compliant for the key " + aKey
-                          userInfo:[CPDictionary dictionaryWithObjects:[self, aKey] forKeys:[CPTargetObjectUserInfoKey, CPUnknownUserInfoKey]]] raise];
+                          userInfo:@{ CPTargetObjectUserInfoKey: self, CPUnknownUserInfoKey: aKey }] raise];
 }
 
 - (void)setValue:(id)aValue forKeyPath:(CPString)aKeyPath
@@ -180,6 +187,12 @@ var CPObjectAccessorsForClassKey            = @"$CPObjectAccessorsForClassKey",
 
 - (void)setValue:(id)aValue forKey:(CPString)aKey
 {
+    // setValue:forKey: should unwrap CPValue by default. In Objective-C we would need to care about which type
+    // the setter takes (or target ivar) and send [aValue rectValue], [aValue pointValue] etc, but in
+    // Objective-C we can use them interchangably.
+    if (aValue && aValue.isa && [aValue isKindOfClass:CPValue])
+        aValue = [aValue JSObject];
+
     var theClass = [self class],
         modifier = nil,
         modifiers = theClass[CPObjectModifiersForClassKey];
@@ -251,7 +264,7 @@ var CPObjectAccessorsForClassKey            = @"$CPObjectAccessorsForClassKey",
 {
     [[CPException exceptionWithName:CPUndefinedKeyException
                             reason:[self _objectDescription] + " is not key value coding-compliant for the key " + aKey
-                          userInfo:[CPDictionary dictionaryWithObjects:[self, aKey] forKeys:[CPTargetObjectUserInfoKey, CPUnknownUserInfoKey]]] raise];
+                          userInfo:@{ CPTargetObjectUserInfoKey: self, CPUnknownUserInfoKey: aKey }] raise];
 }
 
 - (CPString)_objectDescription

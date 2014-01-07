@@ -24,6 +24,7 @@
 @import "CPNull.j"
 @import "_CPCollectionKVCOperators.j"
 
+@class CPIndexSet
 
 @implementation CPObject (CPArrayKVO)
 
@@ -111,46 +112,57 @@
     var capitalizedKey = _key.charAt(0).toUpperCase() + _key.substring(1);
 
     _insertSEL = sel_getName(@"insertObject:in" + capitalizedKey + "AtIndex:");
+
     if ([_proxyObject respondsToSelector:_insertSEL])
         _insert = [_proxyObject methodForSelector:_insertSEL];
 
     _removeSEL = sel_getName(@"removeObjectFrom" + capitalizedKey + "AtIndex:");
+
     if ([_proxyObject respondsToSelector:_removeSEL])
         _remove = [_proxyObject methodForSelector:_removeSEL];
 
     _replaceSEL = sel_getName(@"replaceObjectIn" + capitalizedKey + "AtIndex:withObject:");
+
     if ([_proxyObject respondsToSelector:_replaceSEL])
         _replace = [_proxyObject methodForSelector:_replaceSEL];
 
     _insertManySEL = sel_getName(@"insert" + capitalizedKey + ":atIndexes:");
+
     if ([_proxyObject respondsToSelector:_insertManySEL])
         _insertMany = [_proxyObject methodForSelector:_insertManySEL];
 
     _removeManySEL = sel_getName(@"remove" + capitalizedKey + "AtIndexes:");
+
     if ([_proxyObject respondsToSelector:_removeManySEL])
         _removeMany = [_proxyObject methodForSelector:_removeManySEL];
 
     _replaceManySEL = sel_getName(@"replace" + capitalizedKey + "AtIndexes:with" + capitalizedKey + ":");
+
     if ([_proxyObject respondsToSelector:_replaceManySEL])
         _replaceMany = [_proxyObject methodForSelector:_replaceManySEL];
 
     _objectAtIndexSEL = sel_getName(@"objectIn" + capitalizedKey + "AtIndex:");
+
     if ([_proxyObject respondsToSelector:_objectAtIndexSEL])
         _objectAtIndex = [_proxyObject methodForSelector:_objectAtIndexSEL];
 
     _objectsAtIndexesSEL = sel_getName(_key + "AtIndexes:");
+
     if ([_proxyObject respondsToSelector:_objectsAtIndexesSEL])
         _objectsAtIndexes = [_proxyObject methodForSelector:_objectsAtIndexesSEL];
 
     _countSEL = sel_getName(@"countOf" + capitalizedKey);
+
     if ([_proxyObject respondsToSelector:_countSEL])
         _count = [_proxyObject methodForSelector:_countSEL];
 
     _accessSEL = sel_getName(_key);
+
     if ([_proxyObject respondsToSelector:_accessSEL])
         _access = [_proxyObject methodForSelector:_accessSEL];
 
     _setSEL = sel_getName(@"set" + capitalizedKey + ":");
+
     if ([_proxyObject respondsToSelector:_setSEL])
         _set = [_proxyObject methodForSelector:_setSEL];
 
@@ -185,7 +197,7 @@
     [_proxyObject setValue:anObject forKey:_key];
 }
 
-- (unsigned)count
+- (CPUInteger)count
 {
     if (_count)
         return _count(_proxyObject, _countSEL);
@@ -193,7 +205,7 @@
     return [[self _representedObject] count];
 }
 
-- (int)indexOfObject:(CPObject)anObject inRange:(CPRange)aRange
+- (CPUInteger)indexOfObject:(id)anObject inRange:(CPRange)aRange
 {
     var index = aRange.location,
         count = aRange.length,
@@ -210,12 +222,12 @@
     return CPNotFound;
 }
 
-- (int)indexOfObject:(CPObject)anObject
+- (CPUInteger)indexOfObject:(id)anObject
 {
     return [self indexOfObject:anObject inRange:CPMakeRange(0, [self count])];
 }
 
-- (int)indexOfObjectIdenticalTo:(CPObject)anObject inRange:(CPRange)aRange
+- (CPUInteger)indexOfObjectIdenticalTo:(id)anObject inRange:(CPRange)aRange
 {
     var index = aRange.location,
         count = aRange.length;
@@ -227,12 +239,12 @@
     return CPNotFound;
 }
 
-- (int)indexOfObjectIdenticalTo:(CPObject)anObject
+- (CPUInteger)indexOfObjectIdenticalTo:(id)anObject
 {
     return [self indexOfObjectIdenticalTo:anObject inRange:CPMakeRange(0, [self count])];
 }
 
-- (id)objectAtIndex:(unsigned)anIndex
+- (id)objectAtIndex:(CPUInteger)anIndex
 {
     return [[self objectsAtIndexes:[CPIndexSet indexSetWithIndex:anIndex]] firstObject];
 }
@@ -269,7 +281,7 @@
     [self insertObjects:anArray atIndexes:[CPIndexSet indexSetWithIndexesInRange:CPMakeRange([self count], count)]];
 }
 
-- (void)insertObject:(id)anObject atIndex:(unsigned)anIndex
+- (void)insertObject:(id)anObject atIndex:(CPUInteger)anIndex
 {
     [self insertObjects:[anObject] atIndexes:[CPIndexSet indexSetWithIndex:anIndex]];
 }
@@ -310,18 +322,27 @@
     if (_removeMany)
     {
         var indexes = [CPIndexSet indexSet],
-            index = [theObjects count];
+            index = [theObjects count],
+            position = 0,
+            count = [self count];
 
         while (index--)
-            [indexes addIndex:[self indexOfObject:[theObjects objectAtIndex:index]]];
+        {
+            while ((position = [self indexOfObject:[theObjects objectAtIndex:index] inRange:CPMakeRange(position + 1, count)]) !== CPNotFound)
+                [indexes addIndex:position];
+        }
 
         _removeMany(_proxyObject, _removeManySEL, indexes);
     }
     else if (_remove)
     {
-        var index = [theObjects count];
+        var index = [theObjects count],
+            position;
         while (index--)
-            _remove(_proxyObject, _removeSEL, [self indexOfObject:[theObjects objectAtIndex:index]]);
+        {
+            while ((position = [self indexOfObject:[theObjects objectAtIndex:index]]) !== CPNotFound)
+                _remove(_proxyObject, _removeSEL, position);
+        }
     }
     else
     {
@@ -347,7 +368,7 @@
         while ((index = [self indexOfObject:theObject inRange:theRange]) !== CPNotFound)
         {
             [self removeObjectAtIndex:index];
-            theRange = CPIntersectionRange(CPMakeRange(index, length - index), theRange);
+            theRange = CPIntersectionRange(CPMakeRange(index, self.length - index), theRange);
         }
     }
 }
@@ -357,7 +378,7 @@
     [self removeObjectsAtIndexes:[CPIndexSet indexSetWithIndex:[self count] - 1]];
 }
 
-- (void)removeObjectAtIndex:(unsigned)anIndex
+- (void)removeObjectAtIndex:(CPUInteger)anIndex
 {
     [self removeObjectsAtIndexes:[CPIndexSet indexSetWithIndex:anIndex]];
 }
@@ -384,7 +405,7 @@
     }
 }
 
-- (void)replaceObjectAtIndex:(unsigned)anIndex withObject:(id)anObject
+- (void)replaceObjectAtIndex:(CPUInteger)anIndex withObject:(id)anObject
 {
     [self replaceObjectsAtIndexes:[CPIndexSet indexSetWithIndex:anIndex] withObjects:[anObject]]
 }
@@ -421,13 +442,13 @@
 
 - (id)valueForKey:(CPString)aKey
 {
-    if (aKey.indexOf("@") === 0)
+    if (aKey.charAt(0) === "@")
     {
         if (aKey.indexOf(".") !== -1)
             [CPException raise:CPInvalidArgumentException reason:"called valueForKey: on an array with a complex key (" + aKey + "). use valueForKeyPath:"];
 
         if (aKey === "@count")
-            return length;
+            return self.length;
 
         return [self valueForUndefinedKey:aKey];
     }
@@ -514,7 +535,36 @@
 
 @implementation CPArray (KeyValueObserving)
 
-- (void)addObserver:(id)anObserver toObjectsAtIndexes:(CPIndexSet)indexes forKeyPath:(CPString)aKeyPath options:(unsigned)options context:(id)context
+/*!
+    Raises an exception for any key path other than "@count".
+
+    CPArray objects are not observable (except for @count), so this method raises an exception
+    when invoked on an CPArray object. Instead of observing an array, observe the ordered
+    to-many relationship for which the array is the collection of related objects.
+*/
+- (void)addObserver:(id)anObserver forKeyPath:(CPString)aKeyPath options:(CPKeyValueObservingOptions)anOptions context:(id)aContext
+{
+    if (aKeyPath !== @"@count")
+        [CPException raise:CPInvalidArgumentException reason:"[CPArray " + CPStringFromSelector(_cmd) + "] is not supported. Key path: " + aKeyPath];
+}
+
+/*!
+    Raises an exception for any key path other than "@count".
+
+    CPArray objects are not observable (except for @count), so this method raises an exception
+    when invoked on an CPArray object. Instead of observing an array, observe the ordered
+    to-many relationship for which the array is the collection of related objects.
+*/
+- (void)removeObserver:(id)anObserver forKeyPath:(CPString)aKeyPath
+{
+    if (aKeyPath !== @"@count")
+        [CPException raise:CPInvalidArgumentException reason:"[CPArray " + CPStringFromSelector(_cmd) + "] is not supported. Key path: " + aKeyPath];
+}
+
+/*!
+    Registers an observer to receive key value observer notifications for the specified key-path relative to the objects at the indexes.
+*/
+- (void)addObserver:(id)anObserver toObjectsAtIndexes:(CPIndexSet)indexes forKeyPath:(CPString)aKeyPath options:(CPKeyValueObservingOptions)options context:(id)context
 {
     var index = [indexes firstIndex];
 
@@ -526,6 +576,9 @@
     }
 }
 
+/*!
+    Removes anObserver from all key value observer notifications associated with the specified keyPath relative to the array’s objects at indexes.
+*/
 - (void)removeObserver:(id)anObserver fromObjectsAtIndexes:(CPIndexSet)indexes forKeyPath:(CPString)aKeyPath
 {
     var index = [indexes firstIndex];

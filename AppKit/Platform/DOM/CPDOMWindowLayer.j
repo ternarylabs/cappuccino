@@ -23,6 +23,7 @@
 @import <Foundation/CPArray.j>
 @import <Foundation/CPObject.j>
 
+@import "CGGeometry.j"
 
 @implementation CPDOMWindowLayer : CPObject
 {
@@ -78,23 +79,30 @@
     aWindow._isVisible = NO;
 }
 
-- (void)insertWindow:(CPWindow)aWindow atIndex:(unsigned)anIndex
+- (void)insertWindow:(CPWindow)aWindow atIndex:(CPUInteger)anIndex
 {
     // We will have to adjust the z-index of all windows starting at this index.
     var count = [_windows count],
-        zIndex = (anIndex == CPNotFound ? count : anIndex),
+        zIndex = (anIndex === CPNotFound ? count : anIndex),
         isVisible = aWindow._isVisible;
 
     // If the window is already a resident of this layer, remove it.
     if (isVisible)
     {
+        // Adjust the z-index to start at the window being inserted
         zIndex = MIN(zIndex, aWindow._index);
+
+        // If the window being inserted is below the insertion index,
+        // the index will be one less after we remove the window below.
+        if (aWindow._index < anIndex)
+            --anIndex;
+
         [_windows removeObjectAtIndex:aWindow._index];
     }
     else
         ++count;
 
-    if (anIndex == CPNotFound || anIndex >= count)
+    if (anIndex === CPNotFound || anIndex >= count)
         [_windows addObject:aWindow];
     else
         [_windows insertObject:aWindow atIndex:anIndex];
@@ -113,7 +121,7 @@
 
         aWindow._isVisible = YES;
 
-        if ([aWindow isFullBridge])
+        if ([aWindow isFullPlatformWindow])
             [aWindow setFrame:[aWindow._platformWindow usableContentFrame]];
     }
 }
@@ -121,6 +129,54 @@
 - (CPArray)orderedWindows
 {
     return _windows;
+}
+
+/*!
+    Places \c aWindow within an element that clips it to the global rect \c clipRect.
+
+    NOTE: This is only meant for temporary usage during animation and should be balanced
+    with a call to removeClipForWindow:. No attempt is made to make the clipping element follow
+    changes to the window.
+*/
+- (void)clipWindow:(CPWindow)aWindow toRect:(CGRect)clipRect
+{
+    // First check to see if the window is already clipped.
+    // If so, just update its rect.
+    var windowElement = aWindow._DOMElement,
+        clip = document.createElement("div"),
+        style = clip.style;
+
+    style = clip.style;
+    style.className = "cpwindowclip";
+    style.position = "absolute";
+    style.overflow = "hidden";
+
+    style.left = clipRect.origin.x + "px";
+    style.top = clipRect.origin.y + "px";
+    style.width = clipRect.size.width + "px";
+    style.height = clipRect.size.height + "px";
+
+    // Replace the window with the clip element, then put it inside the clip
+    var parent = windowElement.parentNode;
+    CPDOMDisplayServerInsertBefore(parent, clip, windowElement);
+    CPDOMDisplayServerRemoveChild(parent, windowElement);
+    CPDOMDisplayServerAppendChild(clip, windowElement);
+}
+
+/*!
+    Unclips a window that was previously clipped with clipWindow:toWindow:.
+    If the window was not clipped, a warning is logged.
+*/
+- (void)removeClipForWindow:(CPWindow)aWindow
+{
+    var windowElement = aWindow._DOMElement,
+        clip = windowElement.parentNode,
+        parent = clip.parentNode;
+
+    CPDOMDisplayServerRemoveChild(clip, windowElement);
+    [aWindow setFrameOrigin:CGPointMake([aWindow frame].origin.x, clip.offsetTop)];
+    CPDOMDisplayServerInsertBefore(parent, windowElement, clip);
+    CPDOMDisplayServerRemoveChild(parent, clip);
 }
 
 @end

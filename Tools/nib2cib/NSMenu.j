@@ -22,8 +22,6 @@
 
 @import <AppKit/CPMenu.j>
 
-@import "NSMenuItem.j"
-
 
 NS_CPMenuNameMap =
 {
@@ -54,6 +52,8 @@ NS_CPMenuNameMap =
             _name = mappedName;
 
         _showsStateColumn = ![aCoder containsValueForKey:@"NSMenuExcludeMarkColumn"] || ![aCoder decodeBoolForKey:@"NSMenuExcludeMarkColumn"];
+
+        _autoenablesItems = ![aCoder containsValueForKey:@"NSNoAutoenable"] || ![aCoder decodeBoolForKey:@"NSNoAutoenable"];
     }
 
     return self;

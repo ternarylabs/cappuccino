@@ -166,7 +166,7 @@ var CPRunLoopLastNativeRunLoop = 0;
 */
 + (void)initialize
 {
-    if (self != [CPRunLoop class])
+    if (self !== [CPRunLoop class])
         return;
 
     CPMainRunLoop = [[CPRunLoop alloc] init];
@@ -270,7 +270,6 @@ var CPRunLoopLastNativeRunLoop = 0;
 
     aTimer._lastNativeRunLoopsForModes[aMode] = CPRunLoopLastNativeRunLoop;
 
-
     // FIXME: Hack for not doing this in CommonJS
     if ([CFBundle.environments() indexOfObject:("Browser")] !== CPNotFound)
     {
@@ -308,6 +307,7 @@ var CPRunLoopLastNativeRunLoop = 0;
         nextTimerFireDate = _nextTimerFireDatesForModes[aMode];
 
     // Perform Timers if necessary
+
     if (_didAddTimer || nextTimerFireDate && nextTimerFireDate <= now)
     {
         _didAddTimer = NO;
@@ -326,12 +326,16 @@ var CPRunLoopLastNativeRunLoop = 0;
 
         _timersForModes[aMode] = nil;
 
-        //  Loop through timers looking for ones that had fired
+        // If we're running in CommonJS (unit tests) we shouldn't wait for at least 1 native run loop
+        // since those will never happen.
+        var hasNativeTimers = [CFBundle.environments() indexOfObject:("Browser")] !== CPNotFound;
+
+        // Loop through timers looking for ones that had fired
         while (index--)
         {
             var timer = timers[index];
 
-            if (timer._lastNativeRunLoopsForModes[aMode] < CPRunLoopLastNativeRunLoop && timer._isValid && timer._fireDate <= now)
+            if ((!hasNativeTimers || timer._lastNativeRunLoopsForModes[aMode] < CPRunLoopLastNativeRunLoop) && timer._isValid && timer._fireDate <= now)
                 [timer fire];
 
             // Timer may or may not still be valid
@@ -375,7 +379,14 @@ var CPRunLoopLastNativeRunLoop = 0;
 
         //initiate a new window.setTimeout if there are any timers
         if (_nextTimerFireDatesForModes[aMode] !== nil)
-            _nativeTimersForModes[aMode] = window.setNativeTimeout(function() { _effectiveDate = nextFireDate; _nativeTimersForModes[aMode] = nil; ++CPRunLoopLastNativeRunLoop; [self limitDateForMode:aMode]; _effectiveDate = nil; }, MAX(0, [nextFireDate timeIntervalSinceNow] * 1000));
+            _nativeTimersForModes[aMode] = window.setNativeTimeout(function()
+                {
+                    _effectiveDate = nextFireDate;
+                    _nativeTimersForModes[aMode] = nil;
+                    ++CPRunLoopLastNativeRunLoop;
+                    [self limitDateForMode:aMode];
+                    _effectiveDate = nil;
+                }, MAX(0, [nextFireDate timeIntervalSinceNow] * 1000));
     }
 
     // Run loop performers

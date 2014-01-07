@@ -20,13 +20,11 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
+#include "Foundation.h"
+
 @import "CPArray.j"
 @import "CPObject.j"
 @import "CPRange.j"
-
-#define _CPMaxRange(aRange) ((aRange).location + (aRange).length)
-#define _CPMakeRange(aLocation, aLength) { location:(aLocation), length:aLength }
-#define _CPMakeRangeCopy(aRange) { location:(aRange).location, length:(aRange).length }
 
 /*!
     @class CPIndexSet
@@ -72,7 +70,7 @@
 
 - (id)init
 {
-    return [self initWithIndexesInRange:_CPMakeRange(0, 0)];
+    return [self initWithIndexesInRange:CPMakeRange(0, 0)];
 }
 
 /*!
@@ -81,7 +79,11 @@
 */
 - (id)initWithIndex:(CPInteger)anIndex
 {
-    return [self initWithIndexesInRange:_CPMakeRange(anIndex, 1)];
+    if (!_IS_NUMERIC(anIndex))
+        [CPException raise:CPInvalidArgumentException
+                    reason:"Invalid index"];
+
+    return [self initWithIndexesInRange:CPMakeRange(anIndex, 1)];
 }
 
 /*!
@@ -91,6 +93,9 @@
 */
 - (id)initWithIndexesInRange:(CPRange)aRange
 {
+    if (aRange.location < 0)
+        [CPException raise:CPInvalidArgumentException reason:"Range " + CPStringFromRange(aRange) + " is out of bounds."];
+
     self = [super init];
 
     if (self)
@@ -124,7 +129,7 @@
             otherRangesCount = otherRanges.length;
 
         while (otherRangesCount--)
-            _ranges[otherRangesCount] = _CPMakeRangeCopy(otherRanges[otherRangesCount]);
+            _ranges[otherRangesCount] = CPMakeRangeCopy(otherRanges[otherRangesCount]);
     }
 
     return self;
@@ -254,7 +259,7 @@
     if (FLOOR(lhsRangeIndex) === lhsRangeIndex)
         return YES;
 
-    var rhsRangeIndex = assumedPositionOfIndex(_ranges, _CPMaxRange(aRange) - 1);
+    var rhsRangeIndex = assumedPositionOfIndex(_ranges, CPMaxRange(aRange) - 1);
 
     if (FLOOR(rhsRangeIndex) === rhsRangeIndex)
         return YES;
@@ -288,7 +293,7 @@
 - (CPInteger)lastIndex
 {
     if (_count > 0)
-        return _CPMaxRange(_ranges[_ranges.length - 1]) - 1;
+        return CPMaxRange(_ranges[_ranges.length - 1]) - 1;
 
     return CPNotFound;
 }
@@ -352,7 +357,7 @@
         return anIndex;
 
     // If not, it must be the first element of this range.
-    return _CPMaxRange(range) - 1;
+    return CPMaxRange(range) - 1;
 }
 
 /*!
@@ -397,7 +402,7 @@
     if (aRange)
     {
         var firstIndex = aRange.location,
-            lastIndex = _CPMaxRange(aRange) - 1,
+            lastIndex = CPMaxRange(aRange) - 1,
             rangeIndex = CEIL(assumedPositionOfIndex(_ranges, firstIndex)),
             lastRangeIndex = FLOOR(assumedPositionOfIndex(_ranges, lastIndex));
     }
@@ -413,7 +418,7 @@
     {
         var range = _ranges[rangeIndex],
             index = MAX(firstIndex, range.location),
-            maxRange = MIN(lastIndex + 1, _CPMaxRange(range));
+            maxRange = MIN(lastIndex + 1, CPMaxRange(range));
 
         for (; index < maxRange; ++index)
         {
@@ -492,7 +497,7 @@
 {
     if (!_count)
         return;
-    [self enumerateIndexesInRange:CPMakeRange(0, _CPMaxRange(_ranges[_ranges.length - 1])) options:options usingBlock:aFunction];
+    [self enumerateIndexesInRange:CPMakeRange(0, CPMaxRange(_ranges[_ranges.length - 1])) options:options usingBlock:aFunction];
 }
 
 - (void)enumerateIndexesInRange:(CPRange)enumerationRange options:(CPEnumerationOptions)options usingBlock:(Function /*(int idx, @ref BOOL stop)*/)aFunction
@@ -520,22 +525,21 @@
 
     for (; index !== stop; index += increment)
     {
-        var range = _ranges[index];
-
-        var rangeIndex,
+        var range = _ranges[index],
+            rangeIndex,
             rangeStop,
             rangeIncrement;
 
         if (options & CPEnumerationReverse)
         {
-            rangeIndex = _CPMaxRange(range) - 1;
+            rangeIndex = CPMaxRange(range) - 1;
             rangeStop = range.location - 1;
             rangeIncrement = -1;
         }
         else
         {
             rangeIndex = range.location;
-            rangeStop = _CPMaxRange(range);
+            rangeStop = CPMaxRange(range);
             rangeIncrement = 1;
         }
 
@@ -543,7 +547,7 @@
         {
             if (CPLocationInRange(rangeIndex, enumerationRange))
             {
-                aFunction(rangeIndex, AT_REF(shouldStop));
+                aFunction(rangeIndex, @ref(shouldStop));
                 if (shouldStop)
                     return;
             }
@@ -551,6 +555,151 @@
     }
 }
 
+- (unsigned)indexPassingTest:(Function /*(int anIndex)*/)aPredicate
+{
+    return [self indexWithOptions:CPEnumerationNormal passingTest:aPredicate];
+}
+
+- (CPIndexSet)indexesPassingTest:(Function /*(int anIndex)*/)aPredicate
+{
+    return [self indexesWithOptions:CPEnumerationNormal passingTest:aPredicate];
+}
+
+- (unsigned)indexWithOptions:(CPEnumerationOptions)anOptions passingTest:(Function /*(int anIndex)*/)aPredicate
+{
+    if (!_count)
+        return CPNotFound;
+
+    return [self indexInRange:CPMakeRange(0, CPMaxRange(_ranges[_ranges.length - 1])) options:anOptions passingTest:aPredicate];
+}
+
+- (CPIndexSet)indexesWithOptions:(CPEnumerationOptions)anOptions passingTest:(Function /*(int anIndex)*/)aPredicate
+{
+    if (!_count)
+        return [CPIndexSet indexSet];
+
+    return [self indexesInRange:CPMakeRange(0, CPMaxRange(_ranges[_ranges.length - 1])) options:anOptions passingTest:aPredicate];
+}
+
+- (unsigned)indexInRange:(CPRange)aRange options:(CPEnumerationOptions)anOptions passingTest:(Function /*(int anIndex)*/)aPredicate
+{
+    if (!_count || CPEmptyRange(aRange))
+        return CPNotFound;
+
+    var shouldStop = NO,
+        index,
+        stop,
+        increment;
+
+    if (anOptions & CPEnumerationReverse)
+    {
+        index = _ranges.length - 1,
+        stop = -1,
+        increment = -1;
+    }
+    else
+    {
+        index = 0;
+        stop = _ranges.length;
+        increment = 1;
+    }
+
+    for (; index !== stop; index += increment)
+    {
+        var range = _ranges[index],
+            rangeIndex,
+            rangeStop,
+            rangeIncrement;
+
+        if (anOptions & CPEnumerationReverse)
+        {
+            rangeIndex = CPMaxRange(range) - 1;
+            rangeStop = range.location - 1;
+            rangeIncrement = -1;
+        }
+        else
+        {
+            rangeIndex = range.location;
+            rangeStop = CPMaxRange(range);
+            rangeIncrement = 1;
+        }
+
+        for (; rangeIndex !== rangeStop; rangeIndex += rangeIncrement)
+        {
+            if (CPLocationInRange(rangeIndex, aRange))
+            {
+                if (aPredicate(rangeIndex, @ref(shouldStop)))
+                    return rangeIndex;
+
+                if (shouldStop)
+                    return CPNotFound;
+            }
+        }
+    }
+
+    return CPNotFound;
+}
+
+- (CPIndexSet)indexesInRange:(CPRange)aRange options:(CPEnumerationOptions)anOptions passingTest:(Function /*(int anIndex)*/)aPredicate
+{
+    if (!_count || CPEmptyRange(aRange))
+        return [CPIndexSet indexSet];
+
+    var shouldStop = NO,
+        index,
+        stop,
+        increment;
+
+    if (anOptions & CPEnumerationReverse)
+    {
+        index = _ranges.length - 1,
+        stop = -1,
+        increment = -1;
+    }
+    else
+    {
+        index = 0;
+        stop = _ranges.length;
+        increment = 1;
+    }
+
+    var indexesPassingTest = [CPMutableIndexSet indexSet];
+
+    for (; index !== stop; index += increment)
+    {
+        var range = _ranges[index],
+            rangeIndex,
+            rangeStop,
+            rangeIncrement;
+
+        if (anOptions & CPEnumerationReverse)
+        {
+            rangeIndex = CPMaxRange(range) - 1;
+            rangeStop = range.location - 1;
+            rangeIncrement = -1;
+        }
+        else
+        {
+            rangeIndex = range.location;
+            rangeStop = CPMaxRange(range);
+            rangeIncrement = 1;
+        }
+
+        for (; rangeIndex !== rangeStop; rangeIndex += rangeIncrement)
+        {
+            if (CPLocationInRange(rangeIndex, aRange))
+            {
+                if (aPredicate(rangeIndex, @ref(shouldStop)))
+                    [indexesPassingTest addIndex:rangeIndex];
+
+                if (shouldStop)
+                    return indexesPassingTest;
+            }
+        }
+    }
+
+    return indexesPassingTest;
+}
 
 @end
 
@@ -563,7 +712,7 @@
 */
 - (void)addIndex:(CPInteger)anIndex
 {
-    [self addIndexesInRange:_CPMakeRange(anIndex, 1)];
+    [self addIndexesInRange:CPMakeRange(anIndex, 1)];
 }
 
 /*!
@@ -586,6 +735,9 @@
 */
 - (void)addIndexesInRange:(CPRange)aRange
 {
+    if (aRange.location < 0)
+        [CPException raise:CPInvalidArgumentException reason:"Range " + CPStringFromRange(aRange) + " is out of bounds."];
+
     // If empty range, bail.
     if (aRange.length <= 0)
         return;
@@ -606,7 +758,7 @@
     if (lhsRangeIndexCEIL === lhsRangeIndex && lhsRangeIndexCEIL < rangeCount)
         aRange = CPUnionRange(aRange, _ranges[lhsRangeIndexCEIL]);
 
-    var rhsRangeIndex = assumedPositionOfIndex(_ranges, _CPMaxRange(aRange)),
+    var rhsRangeIndex = assumedPositionOfIndex(_ranges, CPMaxRange(aRange)),
         rhsRangeIndexFLOOR = FLOOR(rhsRangeIndex);
 
     if (rhsRangeIndexFLOOR === rhsRangeIndex && rhsRangeIndexFLOOR >= 0)
@@ -639,7 +791,7 @@
             for (; removal <= lastRemoval; ++removal)
                 _count -= _ranges[removal].length;
 
-            [_ranges removeObjectsInRange:_CPMakeRange(lhsRangeIndexCEIL, removalCount)];
+            [_ranges removeObjectsInRange:CPMakeRange(lhsRangeIndexCEIL, removalCount)];
         }
 
         [_ranges insertObject:aRange atIndex:lhsRangeIndexCEIL];
@@ -655,7 +807,7 @@
 */
 - (void)removeIndex:(CPInteger)anIndex
 {
-    [self removeIndexesInRange:_CPMakeRange(anIndex, 1)];
+    [self removeIndexesInRange:CPMakeRange(anIndex, 1)];
 }
 
 /*!
@@ -709,8 +861,8 @@
         // If these ranges don't start in the same place, we have to cull it.
         if (aRange.location !== existingRange.location)
         {
-            var maxRange = _CPMaxRange(aRange),
-                existingMaxRange = _CPMaxRange(existingRange);
+            var maxRange = CPMaxRange(aRange),
+                existingMaxRange = CPMaxRange(existingRange);
 
             existingRange.length = aRange.location - existingRange.location;
 
@@ -718,7 +870,7 @@
             if (maxRange < existingMaxRange)
             {
                 _count -= aRange.length;
-                [_ranges insertObject:_CPMakeRange(maxRange, existingMaxRange - maxRange) atIndex:lhsRangeIndexCEIL + 1];
+                [_ranges insertObject:CPMakeRange(maxRange, existingMaxRange - maxRange) atIndex:lhsRangeIndexCEIL + 1];
 
                 return;
             }
@@ -730,14 +882,14 @@
         }
     }
 
-    var rhsRangeIndex = assumedPositionOfIndex(_ranges, _CPMaxRange(aRange) - 1),
+    var rhsRangeIndex = assumedPositionOfIndex(_ranges, CPMaxRange(aRange) - 1),
         rhsRangeIndexFLOOR = FLOOR(rhsRangeIndex);
 
     if (rhsRangeIndex === rhsRangeIndexFLOOR && rhsRangeIndexFLOOR >= 0)
     {
-        var maxRange = _CPMaxRange(aRange),
+        var maxRange = CPMaxRange(aRange),
             existingRange = _ranges[rhsRangeIndexFLOOR],
-            existingMaxRange = _CPMaxRange(existingRange);
+            existingMaxRange = CPMaxRange(existingRange);
 
         if (maxRange !== existingMaxRange)
         {
@@ -759,7 +911,7 @@
         for (; removal <= lastRemoval; ++removal)
             _count -= _ranges[removal].length;
 
-        [_ranges removeObjectsInRange:_CPMakeRange(lhsRangeIndexCEIL, removalCount)];
+        [_ranges removeObjectsInRange:CPMakeRange(lhsRangeIndexCEIL, removalCount)];
     }
 }
 
@@ -783,7 +935,7 @@
     for (; i >= 0; --i)
     {
         var range = _ranges[i],
-            maximum = _CPMaxRange(range);
+            maximum = CPMaxRange(range);
 
         if (anIndex >= maximum)
             break;
@@ -803,7 +955,7 @@
             // If it's negative, it needs to be added properly later.
             else if (shifted.location < 0)
             {
-                shifted.length = _CPMaxRange(shifted);
+                shifted.length = CPMaxRange(shifted);
                 shifted.location = 0;
             }
 
@@ -814,8 +966,8 @@
         // Shift the range, and normalize it if the result is negative.
         if ((range.location += aDelta) < 0)
         {
-            _count -= range.length - _CPMaxRange(range);
-            range.length = _CPMaxRange(range);
+            _count -= range.length - CPMaxRange(range);
+            range.length = CPMaxRange(range);
             range.location = 0;
         }
     }
@@ -835,7 +987,7 @@
 
         if ((j = i + 1) < count)
         {
-            [_ranges removeObjectsInRange:_CPMakeRange(j, count - j)];
+            [_ranges removeObjectsInRange:CPMakeRange(j, count - j)];
 
             for (j = 0, count = shifts.length; j < count; ++j)
                 [self addIndexesInRange:shifts[j]];
@@ -951,7 +1103,7 @@ var positionOfIndex = function(ranges, anIndex)
         if (anIndex < range.location)
             high = middle - 1;
 
-        else if (anIndex >= _CPMaxRange(range))
+        else if (anIndex >= CPMaxRange(range))
             low = middle + 1;
 
         else
@@ -979,7 +1131,7 @@ var assumedPositionOfIndex = function(ranges, anIndex)
 
         if (position === positionFLOOR)
         {
-            if (positionFLOOR - 1 >= 0 && anIndex < _CPMaxRange(ranges[positionFLOOR - 1]))
+            if (positionFLOOR - 1 >= 0 && anIndex < CPMaxRange(ranges[positionFLOOR - 1]))
                 high = middle - 1;
 
             else if (positionFLOOR < count && anIndex >= ranges[positionFLOOR].location)
@@ -995,7 +1147,7 @@ var assumedPositionOfIndex = function(ranges, anIndex)
             if (anIndex < range.location)
                 high = middle - 1;
 
-            else if (anIndex >= _CPMaxRange(range))
+            else if (anIndex >= CPMaxRange(range))
                 low = middle + 1;
 
             else
@@ -1035,5 +1187,5 @@ X       - (void)addIndex:(unsigned int)value;
 X       - (void)removeIndex:(unsigned int)value;
 X       - (void)addIndexesInRange:(NSRange)range;
 X       - (void)removeIndexesInRange:(NSRange)range;
-        - (void)shiftIndexesStartingAtIndex:(unsigned int)index by:(int)delta;
+        - (void)shiftIndexesStartingAtIndex:(CPUInteger)index by:(int)delta;
 */

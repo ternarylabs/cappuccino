@@ -24,8 +24,8 @@
 
 @import "CPDictionary.j"
 @import "CPException.j"
-@import "CPExpression.j"
 @import "CPString.j"
+@import "_CPExpression.j"
 
 @implementation _CPVariableExpression :  CPExpression
 {
@@ -48,7 +48,7 @@
     if (self === object)
         return YES;
 
-    if (object.isa !== self.isa || ![[object variable] isEqual:_variable])
+    if (object === nil || object.isa !== self.isa || ![[object variable] isEqual:_variable])
         return NO;
 
     return YES;

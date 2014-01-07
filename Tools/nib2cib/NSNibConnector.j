@@ -20,9 +20,13 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
+@import <AppKit/CPCibBindingConnector.j>
 @import <AppKit/CPCibConnector.j>
 @import <AppKit/CPCibControlConnector.j>
 @import <AppKit/CPCibOutletConnector.j>
+@import <AppKit/CPCibRuntimeAttributesConnector.j>
+@import <AppKit/CPCibHelpConnector.j>
+@import <AppKit/CPKeyValueBinding.j>
 
 NIB_CONNECTION_EQUIVALENCY_TABLE = {};
 
@@ -53,7 +57,8 @@ NIB_CONNECTION_EQUIVALENCY_TABLE = {};
             _destination = NIB_CONNECTION_EQUIVALENCY_TABLE[destinationUID];
         }
 
-        CPLog.debug(@"NSNibConnector: connection: " + [_source description] + " " + [_destination description] + " " + _label);
+        if (_source && _destination)
+            CPLog.debug(@"NSNibConnector: connection: " + [_source description] + " " + [_destination description] + " " + _label);
     }
 
     return self;
@@ -127,7 +132,7 @@ var NSTransformers = [CPSet setWithObjects:
         _binding = [aCoder decodeObjectForKey:@"NSBinding"];
         _keyPath = [aCoder decodeObjectForKey:@"NSKeyPath"];
 
-        _options = [CPDictionary dictionary];
+        _options = @{};
 
         var NSOptions = [aCoder decodeObjectForKey:@"NSOptions"],
             keyEnumerator = [NSOptions keyEnumerator],
@@ -164,6 +169,82 @@ var NSTransformers = [CPSet setWithObjects:
 - (Class)classForKeyedArchiver
 {
     return [CPCibBindingConnector class];
+}
+
+@end
+
+@implementation CPCibRuntimeAttributesConnector (NSCoding)
+
+- (id)NS_initWithCoder:(CPCoder)aCoder
+{
+    self = [super NS_initWithCoder:aCoder];
+
+    if (self)
+    {
+        _source = [aCoder decodeObjectForKey:@"NSObject"];
+        _keyPaths = [aCoder decodeObjectForKey:@"NSKeyPaths"];
+        _values = [aCoder decodeObjectForKey:@"NSValues"];
+
+        var count = [_keyPaths count];
+
+        CPLog.debug(@"NSNibConnector: runtime attributes connector: " + [_source description]);
+
+        while (count--)
+        {
+            var value = _values[count],
+                type = typeof(value) === "boolean" ? "BOOL" : [value className];
+
+            CPLog.debug(@"   %s (%s): %s", _keyPaths[count], type, value);
+        }
+    }
+
+    return self;
+}
+
+@end
+
+@implementation NSIBUserDefinedRuntimeAttributesConnector : CPCibRuntimeAttributesConnector
+
+- (id)initWithCoder:(CPCoder)aCoder
+{
+    return [self NS_initWithCoder:aCoder];
+}
+
+- (Class)classForKeyedArchiver
+{
+    return [CPCibRuntimeAttributesConnector class];
+}
+
+@end
+
+@implementation CPCibHelpConnector (NSCoding)
+
+- (id)NS_initWithCoder:(CPCoder)aCoder
+{
+    self = [super NS_initWithCoder:aCoder];
+
+    if (self)
+    {
+        _destination = [aCoder decodeObjectForKey:@"NSDestination"];
+        _file = [aCoder decodeObjectForKey:@"NSFile"];
+        _marker = [aCoder decodeObjectForKey:@"NSMarker"];
+    }
+
+    return self;
+}
+
+@end
+
+@implementation NSIBHelpConnector : CPCibHelpConnector
+
+- (id)initWithCoder:(CPCoder)aCoder
+{
+    return [self NS_initWithCoder:aCoder];
+}
+
+- (Class)classForKeyedArchiver
+{
+    return [CPCibHelpConnector class];
 }
 
 @end

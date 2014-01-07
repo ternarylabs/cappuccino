@@ -38,6 +38,14 @@
         [self setEnabled:[aCoder decodeBoolForKey:@"NSEnabled"]];
         [self setBordered:[aCoder decodeBoolForKey:@"NSIsBordered"]];
         [self setColor:[aCoder decodeObjectForKey:@"NSColor"]];
+
+        if ([self isBordered])
+        {
+            var frameSize = [self frameSize];
+            CPLog.debug("NSColorWell: adjusting height from %d to %d", frameSize.height, 24.0);
+            frameSize.height = 24.0;
+            [self setFrameSize:frameSize];
+        }
     }
 
     return self;
@@ -51,7 +59,15 @@
 
 - (id)initWithCoder:(CPCoder)aCoder
 {
-    return [self NS_initWithCoder:aCoder];
+    self = [self NS_initWithCoder:aCoder];
+
+    if (self)
+    {
+        var cell = [aCoder decodeObjectForKey:@"NSCell"];
+        [self NS_initWithCell:cell];
+    }
+
+    return self;
 }
 
 - (Class)classForKeyedArchiver

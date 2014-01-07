@@ -25,9 +25,10 @@
 @import <Foundation/CPObject.j>
 @import <Foundation/CPRunLoop.j>
 @import <Foundation/CPString.j>
+@import <Foundation/CPData.j>
 
-@import "CPGeometry.j"
-
+@import "CGGeometry.j"
+@import "CPCompatibility.j"
 
 CPImageLoadStatusInitialized    = 0;
 CPImageLoadStatusLoading        = 1;
@@ -50,15 +51,44 @@ var imagesForNames = { },
 AppKitImageForNames[CPImageNameColorPanel]              = CGSizeMake(26.0, 29.0);
 AppKitImageForNames[CPImageNameColorPanelHighlighted]   = CGSizeMake(26.0, 29.0);
 
-function CPImageInBundle(aFilename, aSize, aBundle)
+/*!
+    Returns a resource image with a relative path and size
+    in a bundle.
+
+    @param filename A filename or relative path to a resource image.
+    @param width    Width of the image. May be omitted.
+    @param height   Height of the image. May be omitted if width is omitted.
+    @param size     Instead of passing width/height, a CGSize may be passed.
+    @param bundle   Bundle in which the image resource can be found.
+                    If omitted, defaults to the main bundle.
+    @return CPImage
+*/
+function CPImageInBundle()
 {
-    if (!aBundle)
-        aBundle = [CPBundle mainBundle];
+    var filename = arguments[0],
+        size = nil,
+        bundle = nil;
 
-    if (aSize)
-        return [[CPImage alloc] initWithContentsOfFile:[aBundle pathForResource:aFilename] size:aSize];
+    if (typeof(arguments[1]) === "number")
+    {
+        if (arguments[1] !== nil && arguments[1] !== undefined)
+            size = CGSizeMake(arguments[1], arguments[2]);
 
-    return [[CPImage alloc] initWithContentsOfFile:[aBundle pathForResource:aFilename]];
+        bundle = arguments[3];
+    }
+    else if (typeof(arguments[1]) === "object")
+    {
+        size = arguments[1];
+        bundle = arguments[2];
+    }
+
+    if (!bundle)
+        bundle = [CPBundle mainBundle];
+
+    if (size)
+        return [[CPImage alloc] initWithContentsOfFile:[bundle pathForResource:filename] size:size];
+
+    return [[CPImage alloc] initWithContentsOfFile:[bundle pathForResource:filename]];
 }
 
 function CPAppKitImage(aFilename, aSize)
@@ -106,19 +136,24 @@ function CPAppKitImage(aFilename, aSize)
 
 /*!
     Initializes the image, by associating it with a filename. The image
-    denoted in \c aFilename is not actually loaded. It will
-    be loaded once needed.
+    denoted in \c aFilename is not actually loaded. It will be loaded
+    once needed.
+
     @param aFilename the file containing the image
     @param aSize the image's size
     @return the initialized image
 */
 - (id)initByReferencingFile:(CPString)aFilename size:(CGSize)aSize
 {
+    // Quietly return nil like in Cocoa, rather than crashing later.
+    if (aFilename === undefined || aFilename === nil)
+        return nil;
+
     self = [super init];
 
     if (self)
     {
-        _size = CPSizeCreateCopy(aSize);
+        _size = CGSizeMakeCopy(aSize);
         _filename = aFilename;
         _loadStatus = CPImageLoadStatusInitialized;
     }
@@ -159,11 +194,56 @@ function CPAppKitImage(aFilename, aSize)
 }
 
 /*!
+    Initializes the receiver with the specified data. The method loads the data into memory.
+    @param someData the CPData object representing the image
+    @return the initialized image
+*/
+- (id)initWithData:(CPData)someData
+{
+    var base64 = [someData base64],
+        type = [base64 hasPrefix:@"/9j/4AAQSkZJRgABAQEASABIAAD/"] ? @"jpg" : @"png",
+        dataURL = "data:image/" + type + ";base64," + base64;
+
+    return [self initWithContentsOfFile:dataURL];
+}
+
+/*!
     Returns the path of the file associated with this image.
 */
 - (CPString)filename
 {
     return _filename;
+}
+
+/*!
+    Returns the data associated with this image.
+    @discussion Returns nil if the reciever was not initialized with -initWithData: and the browser does not support the canvas feature;
+*/
+- (CPData)data
+{
+#if PLATFORM(DOM)
+    var dataURL;
+
+    if ([_filename hasPrefix:@"data:image"])
+        dataURL = _filename;
+    else if (CPFeatureIsCompatible(CPHTMLCanvasFeature))
+    {
+        var canvas = document.createElement("canvas"),
+            ctx = canvas.getContext("2d");
+
+        canvas.width = _image.width,
+        canvas.height = _image.height;
+
+        ctx.drawImage(_image, 0, 0);
+
+        dataURL = canvas.toDataURL("image/png");
+    }
+    else
+        return nil;
+
+    var base64 = dataURL.replace(/^data:image\/png;base64,/, "");
+    return [CPData dataWithBase64:base64];
+#endif
 }
 
 /*!
@@ -225,6 +305,14 @@ function CPAppKitImage(aFilename, aSize)
 - (CPString)name
 {
     return _name;
+}
+
+/*!
+    Returns the underlying Image element for a single image.
+*/
+- (Image)image
+{
+    return _image;
 }
 
 /*!
@@ -313,6 +401,11 @@ function CPAppKitImage(aFilename, aSize)
     // crazy, I know. So don't set isSynchronous here, rather wait a bit longer.
     window.setTimeout(function() { isSynchronous = NO; }, 0);
 #endif
+}
+
+- (BOOL)isSingleImage
+{
+    return YES;
 }
 
 - (BOOL)isThreePartImage
@@ -446,6 +539,11 @@ function CPAppKitImage(aFilename, aSize)
     return _isVertical;
 }
 
+- (BOOL)isSingleImage
+{
+    return NO;
+}
+
 - (BOOL)isThreePartImage
 {
     return YES;
@@ -508,6 +606,11 @@ var CPThreePartImageImageSlicesKey  = @"CPThreePartImageImageSlicesKey",
 - (CPArray)imageSlices
 {
     return _imageSlices;
+}
+
+- (BOOL)isSingleImage
+{
+    return NO;
 }
 
 - (BOOL)isThreePartImage

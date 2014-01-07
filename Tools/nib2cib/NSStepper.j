@@ -22,36 +22,48 @@
 
 @import <AppKit/CPStepper.j>
 
+@import "NSCell.j"
+
+
 @implementation CPStepper (CPCoding)
 
 - (id)NS_initWithCoder:(CPCoder)aCoder
 {
-    self = [super NS_initWithCoder:aCoder];
+    return [super NS_initWithCoder:aCoder];
+}
 
-    if (self)
-    {
-        var cell = [aCoder decodeObjectForKey:@"NSCell"];
+- (void)NS_initWithCell:(NSCell)cell
+{
+    [super NS_initWithCell:cell];
 
-        _minValue = [cell minValue];
-        _maxValue = [cell maxValue];
-        _increment  = [cell increment];
-        _valueWraps = [cell valueWraps];
-        _autorepeat = [cell autorepeat];
-        _objectValue = [cell objectValue];
-    }
+    self._minValue = [cell minValue];
+    self._maxValue = [cell maxValue];
+    self._increment  = [cell increment];
+    self._valueWraps = [cell valueWraps];
+    self._autorepeat = [cell autorepeat];
+    self._objectValue = [cell objectValue];
 
-    return self;
+    // Convert Cocoa normal size to Cappuccino normal size.
+    self._frame.origin.y += 2;
+    self._frame.size.height -= 2;
+    self._bounds.size.height -= 2;
 }
 
 @end
 
 @implementation NSStepper : CPStepper
-{
-}
 
 - (id)initWithCoder:(CPCoder)aCoder
 {
-    return [self NS_initWithCoder:aCoder];
+    self = [self NS_initWithCoder:aCoder];
+
+    if (self)
+    {
+        var cell = [aCoder decodeObjectForKey:@"NSCell"];
+        [self NS_initWithCell:cell];
+    }
+
+    return self;
 }
 
 - (Class)classForKeyedArchiver

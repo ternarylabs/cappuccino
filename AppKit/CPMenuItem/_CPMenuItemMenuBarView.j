@@ -1,54 +1,61 @@
-@import "CPView.j"
+/*
+ * _CPMenuItemMenuBarView.j
+ * AppKit
+ *
+ * Created by Francisco Tolmasky.
+ * Copyright 2009, 280 North, Inc.
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
+ */
 
+@import "CPControl.j"
+@import "_CPImageAndTextView.j"
 
-var HORIZONTAL_MARGIN           = 8.0,
-    SUBMENU_INDICATOR_MARGIN    = 3.0,
-    VERTICAL_MARGIN             = 4.0;
-
-var SelectionColor                              = nil,
-    SUBMENU_INDICATOR_COLOR                     = nil,
-    _CPMenuItemSelectionColor                   = nil,
-    _CPMenuItemTextShadowColor                  = nil,
-
-    _CPMenuItemDefaultStateImages               = [],
-    _CPMenuItemDefaultStateHighlightedImages    = [];
+@class _CPMenuBarWindow
+@class _CPMenuView
 
 @implementation _CPMenuItemMenuBarView : CPView
 {
+    CPColor                 _highlightColor @accessors(property=highlightColor);
+    CPColor                 _textColor @accessors(property=textColor);
+    CPColor                 _textShadowColor @accessors(property=textShadowColor);
+    CPColor                 _highlightTextColor @accessors(property=highlightTextColor);
+    CPColor                 _highlightTextShadowColor @accessors(property=highlightTextShadowColor);
+
     CPMenuItem              _menuItem @accessors(property=menuItem);
 
     CPFont                  _font;
-    CPColor                 _textColor;
-    CPColor                 _textShadowColor;
 
     BOOL                    _isDirty;
+    BOOL                    _shouldHighlight;
 
     _CPImageAndTextView     _imageAndTextView;
-    CPView                  _submenuIndicatorView;
 }
 
-+ (void)initialize
++ (CPString)defaultThemeClass
 {
-    if (self !== [_CPMenuItemMenuBarView class])
-        return;
+    return "menu-item-bar-view";
+}
 
-    var bundle = [CPBundle bundleForClass:self];
-
-    SelectionColor = [CPColor colorWithPatternImage:[[CPImage alloc] initWithContentsOfFile:[bundle pathForResource:@"_CPMenuBarWindow/_CPMenuBarWindowBackgroundSelected.png"] size:CGSizeMake(1.0, 28.0)]];
-
-    SUBMENU_INDICATOR_COLOR = [CPColor grayColor];
-
-    _CPMenuItemSelectionColor =  [CPColor colorWithCalibratedRed:95.0 / 255.0 green:131.0 / 255.0 blue:185.0 / 255.0 alpha:1.0];
-    _CPMenuItemTextShadowColor = [CPColor colorWithCalibratedRed:26.0 / 255.0 green: 73.0 / 255.0 blue:109.0 / 255.0 alpha:1.0];
-
-    _CPMenuItemDefaultStateImages[CPOffState]               = nil;
-    _CPMenuItemDefaultStateHighlightedImages[CPOffState]    = nil;
-
-    _CPMenuItemDefaultStateImages[CPOnState]               = [[CPImage alloc] initWithContentsOfFile:[bundle pathForResource:@"CPMenuItem/CPMenuItemOnState.png"] size:CGSizeMake(14.0, 14.0)];
-    _CPMenuItemDefaultStateHighlightedImages[CPOnState]    = [[CPImage alloc] initWithContentsOfFile:[bundle pathForResource:@"CPMenuItem/CPMenuItemOnStateHighlighted.png"] size:CGSizeMake(14.0, 14.0)];
-
-    _CPMenuItemDefaultStateImages[CPMixedState]             = nil;
-    _CPMenuItemDefaultStateHighlightedImages[CPMixedState]  = nil;
++ (CPDictionary)themeAttributes
+{
+    return @{
+            @"horizontal-margin": 9.0,
+            @"submenu-indicator-margin": 3.0,
+            @"vertical-margin": 4.0,
+        };
 }
 
 + (id)view
@@ -62,7 +69,7 @@ var SelectionColor                              = nil,
 
     if (self)
     {
-        _imageAndTextView = [[_CPImageAndTextView alloc] initWithFrame:CGRectMake(HORIZONTAL_MARGIN, 0.0, 0.0, 0.0)];
+        _imageAndTextView = [[_CPImageAndTextView alloc] initWithFrame:CGRectMake([self valueForThemeAttribute:@"horizontal-margin"], 0.0, 0.0, 0.0)];
 
         [_imageAndTextView setImagePosition:CPImageLeft];
         [_imageAndTextView setImageOffset:3.0];
@@ -71,16 +78,34 @@ var SelectionColor                              = nil,
 
         [self addSubview:_imageAndTextView];
 
-        _submenuIndicatorView = [[_CPMenuItemMenuBarSubmenuIndicatorView alloc] initWithFrame:CGRectMake(0.0, 0.0, 9.0, 6.0)];
-
-        [_submenuIndicatorView setAutoresizingMask:CPViewMinYMargin | CPViewMaxYMargin];
-
-        [self addSubview:_submenuIndicatorView];
-
         [self setAutoresizingMask:CPViewWidthSizable | CPViewHeightSizable];
     }
 
     return self;
+}
+
+- (void)setTextColor:(CPColor)aColor
+{
+    _textColor = aColor;
+    [self setNeedsLayout];
+}
+
+- (void)setTextShadowColor:(CPColor)aColor
+{
+    _textShadowColor = aColor;
+    [self setNeedsLayout];
+}
+
+- (void)setHighlightTextColor:(CPColor)aColor
+{
+    _highlightTextColor = aColor;
+    [self setNeedsLayout];
+}
+
+- (void)setHighlightTextShadowColor:(CPColor)aColor
+{
+    _highlightTextShadowColor = aColor;
+    [self setNeedsLayout];
 }
 
 - (CPColor)textColor
@@ -88,69 +113,63 @@ var SelectionColor                              = nil,
     if (![_menuItem isEnabled])
         return [CPColor lightGrayColor];
 
-    return _textColor || [CPColor colorWithCalibratedRed:70.0 / 255.0 green:69.0 / 255.0 blue:69.0 / 255.0 alpha:1.0];
+    return _textColor || [[CPTheme defaultTheme] valueForAttributeWithName:@"menu-bar-text-color" forClass:_CPMenuView];
 }
 
 - (CPColor)textShadowColor
 {
     if (![_menuItem isEnabled])
-        return [CPColor colorWithWhite:0.8 alpha:0.8];
+        return [CPColor clearColor];
 
-    return _textShadowColor || [CPColor colorWithWhite:1.0 alpha:0.8];
+    return _textShadowColor || [[CPTheme defaultTheme] valueForAttributeWithName:@"menu-bar-text-shadow-color" forClass:_CPMenuView];
+}
+
+- (CPColor)highlightTextColor
+{
+    if (![_menuItem isEnabled])
+        return [CPColor lightGrayColor];
+
+    return _highlightTextColor || [[CPTheme defaultTheme] valueForAttributeWithName:@"menu-bar-highlight-text-color" forClass:_CPMenuView];
+}
+
+- (CPColor)highlightTextShadowColor
+{
+    if (![_menuItem isEnabled])
+        return [CPColor clearColor];
+
+    return _highlightTextShadowColor || [[CPTheme defaultTheme] valueForAttributeWithName:@"menu-bar-highlight-text-shadow-color" forClass:_CPMenuView];
+}
+
+- (CPColor)highlightColor
+{
+    return _highlightColor || [[CPTheme defaultTheme] valueForAttributeWithName:@"menu-bar-window-background-selected-color" forClass:_CPMenuView];
 }
 
 - (void)update
 {
-    var x = HORIZONTAL_MARGIN,
+    var x = [self valueForThemeAttribute:@"horizontal-margin"],
         height = 0.0;
 
+    [_imageAndTextView setText:[_menuItem title]];
     [_imageAndTextView setFont:[_menuItem font] || [_CPMenuBarWindow font]];
     [_imageAndTextView setVerticalAlignment:CPCenterVerticalTextAlignment];
-    [_imageAndTextView setImage:[_menuItem image]];
-    [_imageAndTextView setText:[_menuItem title]];
-    [_imageAndTextView setTextColor:[self textColor]];
-    [_imageAndTextView setTextShadowColor:[self textShadowColor]];
     [_imageAndTextView setTextShadowOffset:CGSizeMake(0.0, 1.0)];
+    [_imageAndTextView setImage:[_menuItem image]];
     [_imageAndTextView sizeToFit];
 
     var imageAndTextViewFrame = [_imageAndTextView frame];
 
     imageAndTextViewFrame.origin.x = x;
     x += CGRectGetWidth(imageAndTextViewFrame);
-    height = MAX(height, CGRectGetHeight(imageAndTextViewFrame));
-
-    var hasSubmenuIndicator = [_menuItem hasSubmenu] && [_menuItem action];
-
-    if (hasSubmenuIndicator)
-    {
-        [_submenuIndicatorView setHidden:NO];
-        [_submenuIndicatorView setColor:[self textColor]];
-        [_submenuIndicatorView setShadowColor:[self textShadowColor]];
-
-        var submenuViewFrame = [_submenuIndicatorView frame];
-
-        submenuViewFrame.origin.x = x + SUBMENU_INDICATOR_MARGIN;
-
-        x = CGRectGetMaxX(submenuViewFrame);
-        height = MAX(height, CGRectGetHeight(submenuViewFrame));
-    }
-    else
-        [_submenuIndicatorView setHidden:YES];
-
-    height += 2.0 * VERTICAL_MARGIN;
+    height = MAX(height, CGRectGetHeight(imageAndTextViewFrame)) + 2.0 * [self valueForThemeAttribute:@"vertical-margin"];
 
     imageAndTextViewFrame.origin.y = FLOOR((height - CGRectGetHeight(imageAndTextViewFrame)) / 2.0);
     [_imageAndTextView setFrame:imageAndTextViewFrame];
 
-    if (hasSubmenuIndicator)
-    {
-        submenuViewFrame.origin.y = FLOOR((height - CGRectGetHeight(submenuViewFrame)) / 2.0) + 1.0;
-        [_submenuIndicatorView setFrame:submenuViewFrame];
-    }
-
     [self setAutoresizesSubviews:NO];
-    [self setFrameSize:CGSizeMake(x + HORIZONTAL_MARGIN, height)];
+    [self setFrameSize:CGSizeMake(x + [self valueForThemeAttribute:@"horizontal-margin"], height)];
     [self setAutoresizesSubviews:YES];
+    [self setNeedsLayout];
 }
 
 - (void)highlight:(BOOL)shouldHighlight
@@ -159,17 +178,20 @@ var SelectionColor                              = nil,
     if (![_menuItem isEnabled])
         shouldHighlight = NO;
 
-    if (shouldHighlight)
+    _shouldHighlight = shouldHighlight;
+    [self setNeedsLayout];
+}
+
+- (void)layoutSubviews
+{
+    if (_shouldHighlight)
     {
         if (![_menuItem _isMenuBarButton])
-            [self setBackgroundColor:SelectionColor];
+            [self setBackgroundColor:[self highlightColor]];
 
         [_imageAndTextView setImage:[_menuItem alternateImage] || [_menuItem image]];
-        [_imageAndTextView setTextColor:[CPColor whiteColor]];
-        [_imageAndTextView setTextShadowColor:_CPMenuItemTextShadowColor];
-
-        [_submenuIndicatorView setColor:[CPColor whiteColor]];
-        [_submenuIndicatorView setShadowColor:[CPColor colorWithWhite:0.1 alpha:0.7]];
+        [_imageAndTextView setTextColor:[self highlightTextColor]];
+        [_imageAndTextView setTextShadowColor:[self highlightTextShadowColor]];
     }
     else
     {
@@ -178,60 +200,7 @@ var SelectionColor                              = nil,
         [_imageAndTextView setImage:[_menuItem image]];
         [_imageAndTextView setTextColor:[self textColor]];
         [_imageAndTextView setTextShadowColor:[self textShadowColor]];
-
-        [_submenuIndicatorView setColor:[self textColor]];
-        [_submenuIndicatorView setShadowColor:[self textShadowColor]];
     }
-}
-
-@end
-
-@implementation _CPMenuItemMenuBarSubmenuIndicatorView : CPView
-{
-    CPColor _color;
-    CPColor _shadowColor;
-}
-
-- (void)setColor:(CPColor)aColor
-{
-    if (_color === aColor)
-        return;
-
-    _color = aColor;
-
-    [self setNeedsDisplay:YES];
-}
-
-- (void)setShadowColor:(CPColor)aColor
-{
-    if (_shadowColor === aColor)
-        return;
-
-    _shadowColor = aColor;
-
-    [self setNeedsDisplay:YES];
-}
-
-- (void)drawRect:(CGRect)aRect
-{
-    var context = [[CPGraphicsContext currentContext] graphicsPort],
-        bounds = [self bounds];
-
-    bounds.size.height -= 1.0;
-    bounds.size.width -= 2.0;
-    bounds.origin.x += 1.0;
-
-    CGContextBeginPath(context);
-
-    CGContextMoveToPoint(context, CGRectGetMinX(bounds), CGRectGetMinY(bounds));
-    CGContextAddLineToPoint(context, CGRectGetMaxX(bounds), CGRectGetMinY(bounds));
-    CGContextAddLineToPoint(context, CGRectGetMidX(bounds), CGRectGetMaxY(bounds));
-
-    CGContextClosePath(context);
-
-    CGContextSetShadowWithColor(context, CGSizeMake(0.0, 1.0), 1.1, _shadowColor || [CPColor whiteColor]);
-    CGContextSetFillColor(context, _color || [CPColor blackColor]);
-    CGContextFillPath(context);
 }
 
 @end

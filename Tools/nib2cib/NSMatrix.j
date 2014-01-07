@@ -21,10 +21,12 @@
  */
 
 @import <Foundation/CPObject.j>
+@import <AppKit/CPRadio.j>
 @import <AppKit/CPView.j>
 
 @import "NSView.j"
 
+@global NIB_CONNECTION_EQUIVALENCY_TABLE
 
 var NSMatrixRadioModeMask = 0x40000000,
     NSMatrixDrawsBackgroundMask = 0x01000000;
@@ -82,6 +84,7 @@ var NSMatrixRadioModeMask = 0x40000000,
                 [self setBackgroundColor:backgroundColor];
 
             self.isa = [CPView class];
+            NIB_CONNECTION_EQUIVALENCY_TABLE[[self UID]] = radioGroup;
         }
         else
         {
@@ -115,6 +118,7 @@ var NSMatrixRadioModeMask = 0x40000000,
         [self setAllowsMixedState:[aCell allowsMixedState]];
         [self setObjectValue:[aCell objectValue]];
         [self setEnabled:[aCell isEnabled]];
+        [self setTag:[aCell tag]];
     }
 
     return self;

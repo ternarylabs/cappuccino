@@ -20,53 +20,56 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
+@import <Foundation/CPDictionary.j>
 @import <Foundation/CPObject.j>
+@import "CPKeyBinding.j"
+@import "CPPlatform.j"
 
+@class CPMenu
+@class CPPlatformPasteboard
+
+@global CPApp
 
 var PrimaryPlatformWindow   = NULL;
 
 @implementation CPPlatformWindow : CPObject
 {
-    CGRect          _contentRect;
+    CGRect                  _contentRect;
 
-    CPInteger       _level;
-    BOOL            _hasShadow;
-    unsigned        _shadowStyle;
-    CPString        _title;
+    CPInteger               _level;
+    BOOL                    _hasShadow;
+    unsigned                _shadowStyle;
+    CPString                _title;
 
 #if PLATFORM(DOM)
-    DOMWindow       _DOMWindow;
+    DOMWindow               _DOMWindow;
 
-    DOMElement      _DOMBodyElement;
-    DOMElement      _DOMFocusElement;
-    DOMElement      _DOMEventGuard;
-    DOMElement      _DOMScrollingElement;
-    id              _hideDOMScrollingElementTimeout;
+    DOMElement              _DOMBodyElement;
+    DOMElement              _DOMFocusElement;
+    DOMElement              _DOMEventGuard;
+    DOMElement              _DOMScrollingElement;
+    id                      _hideDOMScrollingElementTimeout;
 
-    CPArray         _windowLevels;
-    CPDictionary    _windowLayers;
+    CPArray                 _windowLevels;
+    CPDictionary            _windowLayers;
 
-    BOOL            _mouseIsDown;
-    BOOL            _mouseDownIsRightClick;
-    CGPoint         _lastMouseEventLocation;
-    CPWindow        _mouseDownWindow;
-    CPTimeInterval  _lastMouseUp;
-    CPTimeInterval  _lastMouseDown;
+    BOOL                    _mouseIsDown;
+    BOOL                    _mouseDownIsRightClick;
+    CGPoint                 _lastMouseEventLocation;
+    CPWindow                _mouseDownWindow;
+    CPTimeInterval          _lastMouseUp;
+    CPTimeInterval          _lastMouseDown;
 
-    Object          _charCodes;
-    unsigned        _keyCode;
-    unsigned        _lastKey;
-    BOOL            _capsLockActive;
-    BOOL            _ignoreNativeCopyOrCutEvent;
-    BOOL            _ignoreNativePastePreparation;
+    Object                  _charCodes;
+    unsigned                _keyCode;
+    unsigned                _lastKey;
+    BOOL                    _capsLockActive;
 
-    BOOL            _DOMEventMode;
+    BOOL                    _DOMEventMode;
 
-    // Native Pasteboard Support
-    DOMElement      _DOMPasteboardElement;
-    CPEvent         _pasteboardKeyDownEvent;
+    CPPlatformPasteboard    _platformPasteboard;
 
-    CPString        _overriddenEventType;
+    CPString                _overriddenEventType;
 #endif
 }
 
@@ -100,11 +103,11 @@ var PrimaryPlatformWindow   = NULL;
 
     if (self)
     {
-        _contentRect = _CGRectMakeCopy(aRect);
+        _contentRect = CGRectMakeCopy(aRect);
 
 #if PLATFORM(DOM)
         _windowLevels = [];
-        _windowLayers = [CPDictionary dictionary];
+        _windowLayers = @{};
 
         _charCodes = {};
 #endif
@@ -115,19 +118,19 @@ var PrimaryPlatformWindow   = NULL;
 
 - (id)init
 {
-    return [self initWithContentRect:_CGRectMake(0.0, 0.0, 400.0, 500.0)];
+    return [self initWithContentRect:CGRectMake(0.0, 0.0, 400.0, 500.0)];
 }
 
 - (CGRect)contentRect
 {
-    return _CGRectMakeCopy(_contentRect);
+    return CGRectMakeCopy(_contentRect);
 }
 
 - (CGRect)contentBounds
 {
     var contentBounds = [self contentRect];
 
-    contentBounds.origin = _CGPointMakeZero();
+    contentBounds.origin = CGPointMakeZero();
 
     return contentBounds;
 }
@@ -156,10 +159,10 @@ var PrimaryPlatformWindow   = NULL;
 
 - (void)setContentRect:(CGRect)aRect
 {
-    if (!aRect || _CGRectEqualToRect(_contentRect, aRect))
+    if (!aRect || CGRectEqualToRect(_contentRect, aRect))
         return;
 
-    _contentRect = _CGRectMakeCopy(aRect);
+    _contentRect = CGRectMakeCopy(aRect);
 
 #if PLATFORM(DOM)
      [self updateNativeContentRect];
@@ -175,14 +178,14 @@ var PrimaryPlatformWindow   = NULL;
 {
     var contentRect = [self contentRect];
 
-    return _CGPointMake(aPoint.x + _CGRectGetMinX(contentRect), aPoint.y + _CGRectGetMinY(contentRect));
+    return CGPointMake(aPoint.x + CGRectGetMinX(contentRect), aPoint.y + CGRectGetMinY(contentRect));
 }
 
 - (CGPoint)convertScreenToBase:(CGPoint)aPoint
 {
     var contentRect = [self contentRect];
 
-    return _CGPointMake(aPoint.x - _CGRectGetMinX(contentRect), aPoint.y - _CGRectGetMinY(contentRect));
+    return CGPointMake(aPoint.x - CGRectGetMinX(contentRect), aPoint.y - CGRectGetMinY(contentRect));
 }
 
 - (BOOL)isVisible
@@ -264,9 +267,12 @@ var PrimaryPlatformWindow   = NULL;
     _title = aTitle;
 
 #if PLATFORM(DOM)
-    if (_DOMWindow && _DOMWindow.document
-        && (aWindow === [CPApp mainWindow] || [aWindow platformWindow] !== [CPPlatformWindow primaryPlatformWindow]))
+    if (_DOMWindow &&
+        _DOMWindow.document &&
+        ([aWindow isFullPlatformWindow]))
+    {
         _DOMWindow.document.title = _title;
+    }
 #endif
 }
 
@@ -278,5 +284,5 @@ var PrimaryPlatformWindow   = NULL;
 @end
 
 #if PLATFORM(BROWSER)
-@import "CPPlatformWindow+DOM.j"
+//@import "CPPlatformWindow+DOM.j"
 #endif

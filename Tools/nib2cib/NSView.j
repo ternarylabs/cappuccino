@@ -45,16 +45,17 @@ var NSViewAutoresizingMask = 0x3F,
 
     if (self)
     {
-        _tag = 0;
-
-        if ([aCoder containsValueForKey:@"NSTag"])
-            _tag = [aCoder decodeIntForKey:@"NSTag"];
+        _tag = [aCoder decodeIntForKey:@"NSTag"];
 
         _bounds = CGRectMake(0.0, 0.0, CGRectGetWidth(_frame), CGRectGetHeight(_frame));
 
         _window = [aCoder decodeObjectForKey:@"NSWindow"];
         _superview = [aCoder decodeObjectForKey:@"NSSuperview"];
         _subviews = [aCoder decodeObjectForKey:@"NSSubviews"];
+
+        _hierarchyScaleSize = CGSizeMake(1.0 , 1.0);
+        _scaleSize = CGSizeMake(1.0, 1.0);
+        _isScaled = NO;
 
         if (!_subviews)
             _subviews = [];
@@ -68,9 +69,13 @@ var NSViewAutoresizingMask = 0x3F,
         _isHidden = vFlags & NSViewHiddenMask;
         _opacity = 1.0;//[aCoder decodeIntForKey:CPViewOpacityKey];
 
+        _themeClass = [self themeClass];
         _themeAttributes = {};
         _themeState = CPThemeStateNormal;
         [self _loadThemeAttributes];
+
+        if ([aCoder containsValueForKey:@"NSReuseIdentifierKey"])
+            _identifier = [aCoder decodeObjectForKey:@"NSReuseIdentifierKey"];
     }
 
     return self;
@@ -79,6 +84,34 @@ var NSViewAutoresizingMask = 0x3F,
 - (BOOL)NS_isFlipped
 {
     return NO;
+}
+
+- (void)awakeFromNib
+{
+    var superview = [self superview];
+
+    if (!superview || [superview NS_isFlipped])
+        return;
+
+    var superviewHeight = CGRectGetHeight([superview bounds]),
+        frame = [self frame];
+
+    [self setFrameOrigin:CGPointMake(CGRectGetMinX(frame), superviewHeight - CGRectGetMaxY(frame))];
+
+    var NS_autoresizingMask = [self autoresizingMask],
+        autoresizingMask = NS_autoresizingMask & ~(CPViewMaxYMargin | CPViewMinYMargin);
+
+    if (!(NS_autoresizingMask & (CPViewMaxYMargin | CPViewMinYMargin | CPViewHeightSizable)))
+        autoresizingMask |= CPViewMinYMargin;
+    else
+    {
+        if (NS_autoresizingMask & CPViewMaxYMargin)
+            autoresizingMask |= CPViewMinYMargin;
+        if (NS_autoresizingMask & CPViewMinYMargin)
+            autoresizingMask |= CPViewMaxYMargin;
+    }
+
+    [self setAutoresizingMask:autoresizingMask];
 }
 
 @end

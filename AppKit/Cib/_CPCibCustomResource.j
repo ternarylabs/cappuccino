@@ -26,26 +26,46 @@
 @import <Foundation/CPObject.j>
 @import <Foundation/CPString.j>
 
+@import "CPCompatibility.j"
+@import "CPImage.j"
+@import "CPTheme.j"
+
+@class CPButtonBar
+@class CPView
 
 var _CPCibCustomResourceClassNameKey    = @"_CPCibCustomResourceClassNameKey",
     _CPCibCustomResourceResourceNameKey = @"_CPCibCustomResourceResourceNameKey",
-    _CPCibCustomResourcePropertiesKey   = @"_CPCibCustomResourcePropertiesKey";
+    _CPCibCustomResourcePropertiesKey   = @"_CPCibCustomResourcePropertiesKey",
+
+    _CPCibCustomResourceTemplateImageMap = nil;
+
 
 @implementation _CPCibCustomResource : CPObject
 {
     CPString        _className;
     CPString        _resourceName;
     CPDictionary    _properties;
+    CPBundle        _bundle;
 }
 
++ (void)initialize
+{
+    if (self !== [_CPCibCustomResource class])
+        return;
+
+    _CPCibCustomResourceTemplateImageMap = @{
+        "CPAddTemplate": "button-image-plus",
+        "CPRemoveTemplate": "button-image-minus"
+    };
+}
 + (id)imageResourceWithName:(CPString)aResourceName size:(CGSize)aSize
 {
-    return [[self alloc] initWithClassName:@"CPImage" resourceName:aResourceName properties:[CPDictionary dictionaryWithObject:aSize forKey:@"size"]];
+    return [[self alloc] initWithClassName:@"CPImage" resourceName:aResourceName properties:@{ @"size": aSize }];
 }
 
 + (id)imageResourceWithName:(CPString)aResourceName size:(CGSize)aSize bundleClass:(CPString)aBundleClass
 {
-    return [[self alloc] initWithClassName:@"CPImage" resourceName:aResourceName properties:[CPDictionary dictionaryWithObjects:[aSize, aBundleClass] forKeys:[@"size", @"bundleClass"]]];
+    return [[self alloc] initWithClassName:@"CPImage" resourceName:aResourceName properties:@{ @"size": aSize, @"bundleClass": aBundleClass }];
 }
 
 - (id)initWithClassName:(CPString)aClassName resourceName:(CPString)aResourceName properties:(CPDictionary)properties
@@ -57,6 +77,7 @@ var _CPCibCustomResourceClassNameKey    = @"_CPCibCustomResourceClassNameKey",
         _className = aClassName;
         _resourceName = aResourceName;
         _properties = properties;
+        _bundle = nil;
     }
 
     return self;
@@ -71,6 +92,7 @@ var _CPCibCustomResourceClassNameKey    = @"_CPCibCustomResourceClassNameKey",
         _className = [aCoder decodeObjectForKey:_CPCibCustomResourceClassNameKey];
         _resourceName = [aCoder decodeObjectForKey:_CPCibCustomResourceResourceNameKey];
         _properties = [aCoder decodeObjectForKey:_CPCibCustomResourcePropertiesKey];
+        _bundle = nil;
     }
 
     return self;
@@ -89,49 +111,87 @@ var _CPCibCustomResourceClassNameKey    = @"_CPCibCustomResourceClassNameKey",
         (![aCoder respondsToSelector:@selector(awakenCustomResources)] || [aCoder awakenCustomResources]))
         if (_className === @"CPImage")
         {
-            if (_resourceName == "CPAddTemplate")
-                return [[CPImage alloc] initWithContentsOfFile:[[CPBundle bundleForClass:[CPButtonBar class]] pathForResource:@"plus_button.png"] size:CGSizeMake(11, 12)];
-            else if (_resourceName == "CPRemoveTemplate")
-                return [[CPImage alloc] initWithContentsOfFile:[[CPBundle bundleForClass:[CPButtonBar class]] pathForResource:@"minus_button.png"] size:CGSizeMake(11, 4)];
+            var templateImage = [_CPCibCustomResourceTemplateImageMap objectForKey:_resourceName];
 
-            return [self imageFromBundle:[aCoder bundle]];
+            if (templateImage)
+                return [[CPTheme defaultTheme] valueForAttributeWithName:templateImage forClass:[CPButtonBar class]];
+            else
+                return [self imageFromCoder:aCoder];
         }
 
     return self;
-}
-
-- (CPImage)imageFromBundle:(CPBundle)aBundle
-{
-    if (!aBundle)
-    {
-        var bundleClass = _properties.valueForKey(@"bundleClass");
-
-        if (bundleClass)
-        {
-            bundleClass = CPClassFromString(bundleClass);
-
-            if (bundleClass)
-                aBundle = [CPBundle bundleForClass:bundleClass];
-        }
-        else
-            aBundle = [CPBundle mainBundle];
-    }
-
-    return [[CPImage alloc] initWithContentsOfFile:[aBundle pathForResource:_resourceName] size:_properties.valueForKey(@"size")];
 }
 
 @end
 
 @implementation _CPCibCustomResource (CPImage)
 
+- (CPBundle)imageBundleWithCoder:(CPCoder)aCoder
+{
+    if (_bundle)
+        return _bundle;
+
+    var bundleIdentifier = [_properties valueForKey:@"bundleIdentifier"];
+
+    if (bundleIdentifier)
+        _bundle = [CPBundle bundleWithIdentifier:bundleIdentifier];
+    else
+    {
+        var bundleClass = [_properties valueForKey:@"bundleClass"];
+
+        if (bundleClass)
+        {
+            bundleClass = CPClassFromString(bundleClass);
+
+            if (bundleClass)
+                _bundle = [CPBundle bundleForClass:bundleClass];
+        }
+    }
+
+    if (!_bundle)
+    {
+        var framework = [_properties valueForKey:@"framework"];
+
+        if (framework)
+        {
+            // Get AppKit and hope the framework is in the same directory
+            var appKit = [CPBundle bundleForClass:[CPView class]],
+                url = [[appKit bundleURL] URLByDeletingLastPathComponent];
+
+            url = [CPURL URLWithString:framework relativeToURL:url];
+            _bundle = [CPBundle bundleWithURL:url];
+        }
+    }
+
+    if (!_bundle)
+    {
+        if (aCoder)
+            _bundle = [aCoder bundle];
+        else
+            _bundle = [CPBundle mainBundle];
+    }
+
+    return _bundle;
+}
+
+- (CPImage)imageFromCoder:(CPCoder)aCoder
+{
+    return [[CPImage alloc] initWithContentsOfFile:[[self imageBundleWithCoder:aCoder] pathForResource:_resourceName] size:[_properties valueForKey:@"size"]];
+}
+
 - (CPString)filename
 {
-    return [[CPBundle mainBundle] pathForResource:_resourceName];
+    return [[self imageBundleWithCoder:nil] pathForResource:_resourceName];
 }
 
 - (CGSize)size
 {
     return [_properties objectForKey:@"size"];
+}
+
+- (BOOL)isSingleImage
+{
+    return YES;
 }
 
 - (BOOL)isThreePartImage
@@ -156,7 +216,7 @@ var _CPCibCustomResourceClassNameKey    = @"_CPCibCustomResourceClassNameKey",
 
 - (CPString)description
 {
-    var image = [self imageFromBundle:nil];
+    var image = [self imageFromCoder:nil];
 
     return [image description];
 }

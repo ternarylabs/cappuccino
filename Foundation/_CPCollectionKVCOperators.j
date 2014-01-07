@@ -20,7 +20,17 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
+@import "CPObject.j"
+
+var _CPCollectionKVCOperatorSimpleRE = /^@(avg|count|m(ax|in)|sum)(\.|$)/;
+
+
 @implementation _CPCollectionKVCOperator : CPObject
+
++ (BOOL)isSimpleCollectionOperator:(CPString)operator
+{
+    return _CPCollectionKVCOperatorSimpleRE.test(operator);
+}
 
 + (id)performOperation:(CPString)operator withCollection:(id)aCollection propertyPath:(CPString)propertyPath
 {

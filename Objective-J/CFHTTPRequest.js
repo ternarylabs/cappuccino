@@ -63,7 +63,11 @@ var NativeRequest = null;
 
 // We check ActiveXObject first, because we require local file access and
 // overrideMimeType feature (which the native XMLHttpRequest does not have in IE).
-if (window.ActiveXObject !== undefined)
+if (window.XMLHttpRequest)
+{
+    NativeRequest = window.XMLHttpRequest;
+}
+else if (window.ActiveXObject !== undefined)
 {
     // DON'T try 4.0 and 5.0: http://bit.ly/microsoft-msxml-explanation
     var MSXML_XMLHTTP_OBJECTS = ["Msxml2.XMLHTTP.3.0", "Msxml2.XMLHTTP.6.0"],
@@ -89,9 +93,6 @@ if (window.ActiveXObject !== undefined)
         }
     }
 }
-
-if (!NativeRequest)
-    NativeRequest = window.XMLHttpRequest;
 
 GLOBAL(CFHTTPRequest) = function()
 {
@@ -293,23 +294,94 @@ function determineAndDispatchHTTPRequestEvents(/*CFHTTPRequest*/ aRequest)
         eventDispatcher.dispatchEvent({ type:readyStates[aRequest.readyState()], request:aRequest});
 }
 
-function FileRequest(/*CFURL*/ aURL, onsuccess, onfailure)
+function FileRequest(/*CFURL*/ aURL, onsuccess, onfailure, onprogress)
 {
     var request = new CFHTTPRequest();
 
     if (aURL.pathExtension() === "plist")
         request.overrideMimeType("text/xml");
 
+#if COMMONJS
+    if (aURL.pathExtension().toLowerCase() === "j")
+    {
+        var aFilePath = aURL.toString().substring(5),
+            OS = require("os"),
+            gccFlags = require("objective-j").currentCompilerFlags(),
+            gcc = OS.popen("gcc -E -x c -P " + (gccFlags ? gccFlags : "") + " " + OS.enquote(aFilePath), { charset:"UTF-8" }),
+            chunk,
+            fileContents = "";
+
+        while (chunk = gcc.stdout.read())
+            fileContents += chunk;
+
+        if (fileContents.length > 0)
+        {
+            request._nativeRequest.responseText = fileContents;
+            onsuccess({request: request});
+        }
+        else
+        {
+            onfailure({request: request});
+        }
+        return;
+    }
+#endif
+
+    var loaded = 0,
+        progressHandler = null;
+
+    function progress(progressEvent)
+    {
+        onprogress(progressEvent.loaded - loaded);
+        loaded = progressEvent.loaded;
+    }
+
+    function success(anEvent)
+    {
+        // If the browser can't handle progress events,
+        // we need to send a progress message with the total
+        // size of the file when the file finishes loading.
+        if (onprogress && progressHandler === null)
+            onprogress(anEvent.request.responseText().length);
+
+        onsuccess(anEvent);
+    }
+
     if (exports.asyncLoader)
     {
-        request.onsuccess = Asynchronous(onsuccess);
+        request.onsuccess = Asynchronous(success);
         request.onfailure = Asynchronous(onfailure);
     }
     else
     {
-        request.onsuccess = onsuccess;
+        request.onsuccess = success;
         request.onfailure = onfailure;
     }
+
+#if BROWSER
+    if (onprogress)
+    {
+        var supportsProgress = true;
+
+        // document.all means IE, window.atob is only supported by IE 10+
+        if (document.all)
+            supportsProgress = !!window.atob;
+
+        if (supportsProgress)
+        {
+            try
+            {
+                progressHandler = exports.asyncLoader ? Asynchronous(progress) : progress;
+                request._nativeRequest.onprogress = progressHandler;
+            }
+            catch (anException)
+            {
+                // Must be <= IE 9
+                progressHandler = null;
+            }
+        }
+    }
+#endif
 
     request.open("GET", aURL.absoluteString(), exports.asyncLoader);
     request.send("");

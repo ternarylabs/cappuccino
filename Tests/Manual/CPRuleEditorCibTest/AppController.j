@@ -27,9 +27,9 @@ var THEME_ATTRIBUTES = [@"slice-top-border-color", @"slice-bottom-border-color",
 - (void)awakeFromCib
 {
     var contentView = [theWindow contentView];
-    [theWindow setFullBridge:YES];
+    [theWindow setFullPlatformWindow:YES];
     [contentView setBackgroundColor:[CPColor colorWithHexString:@"f3f4f5"]];
-    
+
     var animationClass = (CPBrowserIsEngine(CPWebKitBrowserEngine)) ? [CPViewAnimationTransition class] : [CPViewAnimation class];
     animation = [[animationClass alloc] initWithDuration:0.4 animationCurve:CPAnimationEaseInOut];
     //[ruleEditor setAnimation:animation];
@@ -46,7 +46,7 @@ var THEME_ATTRIBUTES = [@"slice-top-border-color", @"slice-bottom-border-color",
 
 - (void)ruleEditorAction:(id)sender
 {
-    [ruleEditor reloadPredicate];
+    CPLogConsole(_cmd);
     [predicateField setStringValue:[[ruleEditor predicate] predicateFormat]];
 }
 
@@ -109,3 +109,5 @@ var THEME_ATTRIBUTES = [@"slice-top-border-color", @"slice-bottom-border-color",
     [ruleEditor setValue:value forThemeAttribute:attribute];
     [ruleEditor setNeedsDisplay:YES];
 }
+
+@end

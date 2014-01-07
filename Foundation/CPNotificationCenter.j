@@ -25,6 +25,7 @@
 @import "CPException.j"
 @import "CPNotification.j"
 @import "CPNull.j"
+@import "CPSet.j"
 
 var CPNotificationDefaultCenter = nil;
 
@@ -64,7 +65,7 @@ var CPNotificationDefaultCenter = nil;
 
     if (self)
     {
-        _namedRegistries = [CPDictionary dictionary];
+        _namedRegistries = @{};
         _unnamedRegistry = [[_CPNotificationRegistry alloc] init];
     }
    return self;
@@ -188,7 +189,7 @@ var _CPNotificationCenterPostNotification = function(/* CPNotificationCenter */ 
 
     if (self)
     {
-        _objectObservers = [CPDictionary dictionary];
+        _objectObservers = @{};
     }
 
     return self;

@@ -49,7 +49,7 @@
     var bindTesterA = [BindingTestWithBool new],
         bindTesterB = [BindingTestWithBool new];
 
-    [bindTesterB bind:@"stringValue" toObject:bindTesterA withKeyPath:@"stringValue" options:[CPDictionary dictionary]];
+    [bindTesterB bind:@"stringValue" toObject:bindTesterA withKeyPath:@"stringValue" options:@{}];
     [self assert:nil equals:[bindTesterA stringValue] message:"initial A value unchanged"];
     [self assert:nil equals:[bindTesterB stringValue] message:"initial B value unchanged"];
 
@@ -154,12 +154,13 @@
 - (void)testTableColumn
 {
     var tableView = [CPTableView new],
-        tableColumn = [[CPTableColumn alloc] initWithIdentifier:"A Column"],
-        arrayController = [CPArrayController new];
+        tableColumn = [[CPTableColumn alloc] initWithIdentifier:"A Column"];
+
+    arrayController = [CPArrayController new];
 
     [tableView addTableColumn:tableColumn];
 
-    content = [
+    var content = [
         [AccessCounter counterWithValueA:"1" valueB:"2"],
         [AccessCounter counterWithValueA:"3" valueB:"4"],
         [AccessCounter counterWithValueA:"5" valueB:"6"],
@@ -228,7 +229,7 @@
     [textField bind:@"hidden" toObject:self withKeyPath:@"FOO" options:nil];
     [self assert:@"cheese" equals:[textField placeholderString] message:"placeholder should not be cleared when a binding is established"];
 
-    content = [
+    var content = [
         [BindingTester testerWithCheese:@"yellow"],
         [BindingTester testerWithCheese:@"green"],
     ];
@@ -236,7 +237,7 @@
 
     [arrayController setSelectionIndex:0];
 
-    var options = [CPDictionary dictionaryWithJSObject:{CPMultipleValuesPlaceholderBindingOption:@"Multiple Values"}];
+    var options = [CPDictionary dictionaryWithObject:@"Multiple Values" forKey:CPMultipleValuesPlaceholderBindingOption];
     [textField bind:@"value" toObject:arrayController withKeyPath:@"selection.cheese" options:options];
 
     [self assert:@"yellow" equals:[textField stringValue] message:@"text field string value should be 'yellow'"];
@@ -367,7 +368,7 @@
     id lastKey;
 }
 
-- (void)setValue:value forKey:aKey
+- (void)setValue:(id)value forKey:(CPString)aKey
 {
     lastValue = value;
     lastKey = aKey;

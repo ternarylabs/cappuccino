@@ -20,15 +20,10 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
-#import "Ref.h"
+@import "CPString.j"
+@import "CPFormatter.j"
+@import "CPDecimalNumber.j"
 
-@import <Foundation/CPString.j>
-@import <Foundation/CPFormatter.j>
-@import <Foundation/CPDecimalNumber.j>
-
-#define UPDATE_NUMBER_HANDLER_IF_NECESSARY() if (!_numberHandler) \
-    _numberHandler = [CPDecimalNumberHandler decimalNumberHandlerWithRoundingMode:_roundingMode scale:_maximumFractionalDigits raiseOnExactness:NO raiseOnOverflow:NO raiseOnUnderflow:NO raiseOnDivideByZero:YES];
-#define SET_NEEDS_NUMBER_HANDLER_UPDATE() _numberHandler = nil;
 
 CPNumberFormatterNoStyle            = 0;
 CPNumberFormatterDecimalStyle       = 1;
@@ -45,11 +40,16 @@ CPNumberFormatterRoundHalfEven      = CPRoundBankers;
 CPNumberFormatterRoundHalfDown      = _CPRoundHalfDown;
 CPNumberFormatterRoundHalfUp        = CPRoundPlain;
 
+var NumberRegex = new RegExp('(-)?(\\d*)(\\.(\\d*))?');
+
+#define SET_NEEDS_NUMBER_HANDLER_UPDATE() _numberHandler = nil
+
+
 /*!
     @ingroup foundation
     @class CPNumberFormatter
 
-    CPNumberFormatter takes a numeric NSNumber value and formats it as text for
+    CPNumberFormatter takes a numeric CPNumber value and formats it as text for
     display. It also supports the converse, taking text and interpreting it as a
     CPNumber by configurable formatting rules.
 */
@@ -57,9 +57,18 @@ CPNumberFormatterRoundHalfUp        = CPRoundPlain;
 {
     CPNumberFormatterStyle          _numberStyle @accessors(property=numberStyle);
     CPString                        _perMillSymbol @accessors(property=perMillSymbol);
+    CPString                        _groupingSeparator @accessors(property=groupingSeparator);
     CPNumberFormatterRoundingMode   _roundingMode @accessors(property=roundingMode);
-    CPUInteger                      _maximumFractionalDigits @accessors(property=maximalFractionalDigits);
+    CPUInteger                      _minimumFractionDigits @accessors(property=minimumFractionDigits);
+    CPUInteger                      _maximumFractionDigits @accessors(property=maximumFractionDigits);
+    CPUInteger                      _minimum @accessors(property=minimum);
+    CPUInteger                      _maximum @accessors(property=maximum);
+    CPString                        _currencyCode @accessors(property=currencyCode);
+    CPString                        _currencySymbol @accessors(property=currencySymbol);
+    BOOL                            _generatesDecimalNumbers @accessors(property=generatesDecimalNumbers);
 
+    // Note that we do not implement the 10.0 style number formatter, but the 10.4+ formatter. Therefore
+    // we don't expose this through a `roundingBehavior` property.
     CPDecimalNumberHandler         _numberHandler;
 }
 
@@ -67,8 +76,17 @@ CPNumberFormatterRoundHalfUp        = CPRoundPlain;
 {
     if (self = [super init])
     {
-        _roundingMode = CPNumberFormatterRoundHalfUp;
-        _maximumFractionalDigits = 3;
+        _roundingMode = CPNumberFormatterRoundHalfEven;
+        _minimumFractionDigits = 0;
+        _maximumFractionDigits = 0;
+        _groupingSeparator = @",";
+        _generatesDecimalNumbers = YES;
+        _minimum = nil;
+        _maximum = nil;
+
+        // FIXME Add locale support.
+        _currencyCode = @"USD";
+        _currencySymbol = @"$";
     }
 
     return self;
@@ -76,45 +94,86 @@ CPNumberFormatterRoundHalfUp        = CPRoundPlain;
 
 - (CPString)stringFromNumber:(CPNumber)number
 {
+    if (_numberStyle == CPNumberFormatterPercentStyle)
+    {
+        number *= 100.0;
+    }
+
+    var dcmn = [number isKindOfClass:CPDecimalNumber] ? number : [[CPDecimalNumber alloc] _initWithJSNumber:number];
+
     // TODO Add locale support.
     switch (_numberStyle)
     {
+        case CPNumberFormatterCurrencyStyle:
         case CPNumberFormatterDecimalStyle:
-            UPDATE_NUMBER_HANDLER_IF_NECESSARY();
+        case CPNumberFormatterPercentStyle:
+            [self _updateNumberHandlerIfNecessary];
 
-            var dcmn = [CPDecimalNumber numberWithFloat:number];
             dcmn = [dcmn decimalNumberByRoundingAccordingToBehavior:_numberHandler];
 
             var output = [dcmn descriptionWithLocale:nil],
-                parts = [output componentsSeparatedByString:"."], // FIXME Locale specific.
-                preFraction = parts[0],
-                fraction = parts.length > 1 ? parts[1] : "",
+                // FIXME this is probably locale dependent.
+                parts = output.match(NumberRegex) || ["", undefined, "", undefined, undefined],
+                negativePrefix = parts[1] || "",
+                preFraction = parts[2] || "",
+                fraction = parts[4] || "",
                 preFractionLength = [preFraction length],
-                commaPosition = 3,
-                perMillSymbol = [self _effectivePerMillSymbol];
+                commaPosition = 3;
+
+            while (fraction.length < _minimumFractionDigits)
+                fraction += "0";
 
             // TODO This is just a temporary solution. Should be generalised.
             // Add in thousands separators.
-            if (perMillSymbol)
-                while (commaPosition < [preFraction length])
+            if (_groupingSeparator)
+            {
+                for (var commaPosition = 3, prefLength = [preFraction length]; commaPosition < prefLength; commaPosition += 4)
                 {
-                    preFraction = [preFraction stringByReplacingCharactersInRange:CPMakeRange(commaPosition, 0) withString:perMillSymbol];
-                    commaPosition += 4;
+                    preFraction = [preFraction stringByReplacingCharactersInRange:CPMakeRange(prefLength - commaPosition, 0) withString:_groupingSeparator];
+                    prefLength += 1;
                 }
+            }
+
+            var string = preFraction;
 
             if (fraction)
-                return preFraction + "." + fraction;
-            else
-                return preFraction;
+                string += "." + fraction;
+
+            if (_numberStyle === CPNumberFormatterCurrencyStyle)
+            {
+                if (_currencySymbol)
+                    string = _currencySymbol + string;
+                else
+                    string = _currencyCode + string;
+            }
+
+            if (_numberStyle == CPNumberFormatterPercentStyle)
+                string += "%";
+
+            if (negativePrefix)
+                string = negativePrefix + string;
+
+            return string;
+
         default:
             return [number description];
     }
 }
 
-- (CPNumber)numberFromString:(CPString)string
++ (CPString)localizedStringFromNumber:(CPNumber)num numberStyle:(CPNumberFormatterStyle)localizationStyle
 {
-    // TODO
-    return parseFloat(string);
+    var formatter = [[CPNumberFormatter alloc] init];
+    [formatter setNumberStyle:localizationStyle];
+
+    return [formatter stringFromNumber:num];
+}
+
+- (CPNumber)numberFromString:(CPString)aString
+{
+    if (_generatesDecimalNumbers)
+        return [CPDecimalNumber decimalNumberWithString:aString];
+    else
+        return parseFloat(aString);
 }
 
 - (CPString)stringForObjectValue:(id)anObject
@@ -130,24 +189,57 @@ CPNumberFormatterRoundHalfUp        = CPRoundPlain;
     return [self stringForObjectValue:anObject];
 }
 
-- (BOOL)getObjectValue:(id)anObject forString:(CPString)aString errorDescription:(CPString)anError
+- (BOOL)getObjectValue:(idRef)anObjectRef forString:(CPString)aString errorDescription:(CPStringRef)anErrorRef
 {
-    // TODO Error handling.
-    var value = [self numberFromString:aString];
-    AT_DEREF(anObject, value);
+    // Interpret an empty string as nil, like in Cocoa.
+    if (aString === @"")
+    {
+        @deref(anObjectRef) = nil;
+        return YES;
+    }
+
+    var value = [self numberFromString:aString],
+        error = @"";
+
+    // this will return false if we've received anything but a number, most likely NaN
+    if (!isFinite(value))
+        error = @"Value is not a number";
+    else if (_minimum !== nil && value < _minimum)
+        error = @"Value is less than the minimum allowed value";
+    else if (_maximum !== nil && value > _maximum)
+        error = @"Value is greater than the maximum allowed value";
+
+    if (error)
+    {
+        if (anErrorRef)
+            @deref(anErrorRef) = error;
+
+        return NO;
+    }
+
+    @deref(anObjectRef) = value;
 
     return YES;
 }
 
-/*!
-    @ignore
-    Return the perMillSymbol if set, otherwise the locale default.
-*/
-- (CPString)_effectivePerMillSymbol
+- (void)setNumberStyle:(CPNumberFormatterStyle)aStyle
 {
-    if (_perMillSymbol === nil || _perMillSymbol === undefined)
-        return ","; // (FIXME US Locale specific.)
-    return _perMillSymbol;
+    _numberStyle = aStyle;
+
+    switch (aStyle)
+    {
+        case CPNumberFormatterDecimalStyle:
+            _minimumFractionDigits = 0;
+            _maximumFractionDigits = 3;
+            SET_NEEDS_NUMBER_HANDLER_UPDATE();
+            break;
+
+        case CPNumberFormatterCurrencyStyle:
+            _minimumFractionDigits = 2;
+            _maximumFractionDigits = 2;
+            SET_NEEDS_NUMBER_HANDLER_UPDATE();
+            break;
+    }
 }
 
 - (void)setRoundingMode:(CPNumberFormatterRoundingMode)aRoundingMode
@@ -156,15 +248,55 @@ CPNumberFormatterRoundHalfUp        = CPRoundPlain;
     SET_NEEDS_NUMBER_HANDLER_UPDATE();
 }
 
+- (void)setMinimumFractionDigits:(CPUInteger)aNumber
+{
+    _minimumFractionDigits = aNumber;
+    SET_NEEDS_NUMBER_HANDLER_UPDATE();
+}
+
 - (void)setMaximumFractionDigits:(CPUInteger)aNumber
 {
-    _maximumFractionalDigits = aNumber;
+    _maximumFractionDigits = aNumber;
     SET_NEEDS_NUMBER_HANDLER_UPDATE();
+}
+
+- (void)setMinimum:(CPUInteger)aNumber
+{
+    _minimum = aNumber;
+    SET_NEEDS_NUMBER_HANDLER_UPDATE();
+}
+
+- (void)setMaximum:(CPUInteger)aNumber
+{
+    _maximum = aNumber;
+    SET_NEEDS_NUMBER_HANDLER_UPDATE();
+}
+
+#pragma mark Private
+
+- (void)_updateNumberHandlerIfNecessary
+{
+    if (!_numberHandler)
+        _numberHandler = [CPDecimalNumberHandler decimalNumberHandlerWithRoundingMode:_roundingMode
+                                                                                scale:_maximumFractionDigits
+                                                                     raiseOnExactness:NO
+                                                                      raiseOnOverflow:NO
+                                                                     raiseOnUnderflow:NO
+                                                                  raiseOnDivideByZero:YES];
 }
 
 @end
 
-var CPNumberFormatterStyleKey = "CPNumberFormatterStyleKey";
+var CPNumberFormatterStyleKey                   = @"CPNumberFormatterStyleKey",
+    CPNumberFormatterMinimumFractionDigitsKey   = @"CPNumberFormatterMinimumFractionDigitsKey",
+    CPNumberFormatterMaximumFractionDigitsKey   = @"CPNumberFormatterMaximumFractionDigitsKey",
+    CPNumberFormatterMinimumKey                 = @"CPNumberFormatterMinimumKey",
+    CPNumberFormatterMaximumKey                 = @"CPNumberFormatterMaximumKey",
+    CPNumberFormatterRoundingModeKey            = @"CPNumberFormatterRoundingModeKey",
+    CPNumberFormatterGroupingSeparatorKey       = @"CPNumberFormatterGroupingSeparatorKey",
+    CPNumberFormatterCurrencyCodeKey            = @"CPNumberFormatterCurrencyCodeKey",
+    CPNumberFormatterCurrencySymbolKey          = @"CPNumberFormatterCurrencySymbolKey",
+    CPNumberFormatterGeneratesDecimalNumbers    = @"CPNumberFormatterGeneratesDecimalNumbers";
 
 @implementation CPNumberFormatter (CPCoding)
 
@@ -175,6 +307,18 @@ var CPNumberFormatterStyleKey = "CPNumberFormatterStyleKey";
     if (self)
     {
         _numberStyle = [aCoder decodeIntForKey:CPNumberFormatterStyleKey];
+        _minimumFractionDigits = [aCoder decodeIntForKey:CPNumberFormatterMinimumFractionDigitsKey];
+        _maximumFractionDigits = [aCoder decodeIntForKey:CPNumberFormatterMaximumFractionDigitsKey];
+        _roundingMode = [aCoder decodeIntForKey:CPNumberFormatterRoundingModeKey];
+        _groupingSeparator = [aCoder decodeObjectForKey:CPNumberFormatterGroupingSeparatorKey];
+        _currencyCode = [aCoder decodeObjectForKey:CPNumberFormatterCurrencyCodeKey];
+        _currencySymbol = [aCoder decodeObjectForKey:CPNumberFormatterCurrencySymbolKey];
+        _generatesDecimalNumbers = [aCoder decodeBoolForKey:CPNumberFormatterGeneratesDecimalNumbers];
+
+        // We decode _minimum and _maximum as object here because otherwise, nil values are not preserved
+        // causing a min and max always set to 0 after an decoding.
+        _minimum = [aCoder decodeObjectForKey:CPNumberFormatterMinimumKey];
+        _maximum = [aCoder decodeObjectForKey:CPNumberFormatterMaximumKey];
     }
 
     return self;
@@ -185,6 +329,15 @@ var CPNumberFormatterStyleKey = "CPNumberFormatterStyleKey";
     [super encodeWithCoder:aCoder];
 
     [aCoder encodeInt:_numberStyle forKey:CPNumberFormatterStyleKey];
+    [aCoder encodeInt:_minimumFractionDigits forKey:CPNumberFormatterMinimumFractionDigitsKey];
+    [aCoder encodeInt:_maximumFractionDigits forKey:CPNumberFormatterMaximumFractionDigitsKey];
+    [aCoder encodeInt:_minimum forKey:CPNumberFormatterMinimumKey];
+    [aCoder encodeInt:_maximum forKey:CPNumberFormatterMaximumKey];
+    [aCoder encodeInt:_roundingMode forKey:CPNumberFormatterRoundingModeKey];
+    [aCoder encodeObject:_groupingSeparator forKey:CPNumberFormatterGroupingSeparatorKey];
+    [aCoder encodeObject:_currencyCode forKey:CPNumberFormatterCurrencyCodeKey];
+    [aCoder encodeObject:_currencySymbol forKey:CPNumberFormatterCurrencySymbolKey];
+    [aCoder encodeBool:_generatesDecimalNumbers forKey:CPNumberFormatterGeneratesDecimalNumbers];
 }
 
 @end

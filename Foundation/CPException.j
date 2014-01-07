@@ -28,6 +28,7 @@ CPInvalidArgumentException          = @"CPInvalidArgumentException";
 CPUnsupportedMethodException        = @"CPUnsupportedMethodException";
 CPRangeException                    = @"CPRangeException";
 CPInternalInconsistencyException    = @"CPInternalInconsistencyException";
+CPGenericException                  = @"CPGenericException";
 
 /*!
     @class CPException
@@ -46,6 +47,8 @@ if (input == nil)
 @implementation CPException : CPObject
 {
     id          _userInfo;
+    CPString    name;
+    CPString    message;
 }
 
 /*
@@ -65,6 +68,22 @@ if (input == nil)
 */
 + (void)raise:(CPString)aName reason:(CPString)aReason
 {
+    [[self exceptionWithName:aName reason:aReason userInfo:nil] raise];
+}
+
+/*!
+    Raises an exception with a name and a formatted reason.
+    @param aName the name of the exception to raise
+    @param aFormat the reason for the exception in sprintf style
+    @param ... the arguments for the sprintf format
+*/
++ (void)raise:(CPString)aName format:(CPString)aFormat, ...
+{
+    if (!aFormat)
+        [CPException raise:CPInvalidArgumentException
+                    reason:"raise:format: the format can't be 'nil'"];
+
+    var aReason = ObjectiveJ.sprintf.apply(this, Array.prototype.slice.call(arguments, 3));
     [[self exceptionWithName:aName reason:aReason userInfo:nil] raise];
 }
 

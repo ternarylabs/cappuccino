@@ -2,13 +2,14 @@
 require ("../../common.jake");
 
 var OS = require("os"),
-    task = require("jake").task;
+    task = require("jake").task,
+    SYSTEM = require("system");
 
 task ("build", function()
 {
     if (executableExists("xcodebuild"))
     {
-        var args = "-alltargets -configuration " + $CONFIGURATION;
+        var args = "-alltargets -configuration Release";
 
         if (xcodebuildHasTenPointFiveSDK())
             args = "-sdk macosx10.5 " + args;
@@ -16,7 +17,9 @@ task ("build", function()
         else
             args = "-sdk macosx " + args;
 
-        if (OS.system("xcodebuild " + args))
+        var xcodebuild = SYSTEM.env.CAPP_BUILD ? "xcodebuild " : "CAPP_BUILD=../../Build xcodebuild ";
+
+        if (OS.system(xcodebuild + args))
             OS.exit(1);
     }
     else

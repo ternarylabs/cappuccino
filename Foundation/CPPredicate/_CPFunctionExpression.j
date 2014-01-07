@@ -23,8 +23,8 @@
 @import "CPDate.j"
 @import "CPDictionary.j"
 @import "CPException.j"
-@import "CPExpression.j"
 @import "CPString.j"
+@import "_CPExpression.j"
 
 @implementation _CPFunctionExpression : CPExpression
 {
@@ -72,7 +72,7 @@
     if (self === object)
         return YES;
 
-    if (object.isa !== self.isa || ![[object _function] isEqual:_selector] || ![[object operand] isEqual:_operand] || ![[object arguments] isEqualToArray:_arguments])
+    if (object === nil || object.isa !== self.isa || ![[object _function] isEqual:_selector] || ![[object operand] isEqual:_operand] || ![[object arguments] isEqualToArray:_arguments])
         return NO;
 
     return YES;

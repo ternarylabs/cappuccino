@@ -4,7 +4,7 @@
 {
     CPOutlineView   outlineView;
     CPTableColumn   tableColumn;
-    TestDataSource  dataSource;
+    TestOutlineDataSource  dataSource;
 }
 
 - (void)setUp
@@ -17,7 +17,7 @@
 
     [outlineView setAllowsMultipleSelection:YES];
 
-    dataSource = [TestDataSource new];
+    dataSource = [TestOutlineDataSource new];
     [dataSource setEntries:[".1", ".1.1", ".1.2", ".1.2.1", ".1.2.2", ".2", ".3", ".3.1"]];
 
     [outlineView setDataSource:dataSource];
@@ -130,7 +130,7 @@
 
     [outlineView expandItem:".1.2"];
 
-    afterSelection = [outlineView selectedRowIndexes];
+    var afterSelection = [outlineView selectedRowIndexes];
     [self assert:2 equals:[afterSelection count] message:"selections should remain"];
 
     [self assert:".1.1" equals:[outlineView itemAtRow:[afterSelection firstIndex]] message:".1.1 selection should remain"];
@@ -161,6 +161,54 @@
     [self assert:2 equals:[[outlineView selectedRowIndexes] count] message:"selections should remain"];
 }
 
+
+- (void)testExpandCollapseItemVisibility
+{
+    var delegate = [TestExpandCollapseVisibilityDelegate new];
+    [delegate setTester:self];
+    [outlineView setDelegate:delegate];
+
+    [outlineView collapseItem:".1"];
+    [outlineView expandItem:".1"];
+}
+
+- (void)testShouldExpandItemDelegate
+{
+    var delegate = [TestShouldExpandItemDelegate new];
+    // reset state
+    [outlineView collapseItem:".1"];
+    [self assertFalse:[outlineView isItemExpanded:".1"] message:".1 is collapsed by default"];
+    [outlineView expandItem:".1"];
+    [self assertTrue:[outlineView isItemExpanded:".1"] message:".1 is expanded, no restriction"];
+    [outlineView collapseItem:".1"];
+    [self assertFalse:[outlineView isItemExpanded:".1"] message:".1 is collapsed now"];
+
+    [outlineView setDelegate:delegate];
+
+    [outlineView expandItem:".1"];
+    [self assertFalse:[outlineView isItemExpanded:".1"] message:".1 is still collapsed, cannot expand"];
+}
+
+- (void)testShouldCollapseItemDelegate
+{
+    var delegate = [TestShouldCollapseItemDelegate new];
+    // reset state
+    [outlineView collapseItem:".1"];
+
+    [self assertFalse:[outlineView isItemExpanded:".1"] message:".1 is collapsed by default"];
+    [outlineView expandItem:".1"];
+    [self assertTrue:[outlineView isItemExpanded:".1"] message: ".1 is now expanded"];
+    [outlineView collapseItem:".1"];
+    [self assertFalse:[outlineView isItemExpanded:".1"] message: ".1 is now collapsed, no restriction"];
+
+    [outlineView setDelegate:delegate];
+
+    [outlineView expandItem:".1"];
+    [self assertTrue:[outlineView isItemExpanded:".1"] message:".1 is now expanded"];
+    [outlineView collapseItem:".1"];
+    [self assertTrue:[outlineView isItemExpanded:".1"] message:".1 is still expanded, cannot collapse"];
+}
+
 /*!
     Test that the outline view archives properly.
 */
@@ -177,7 +225,7 @@
 
 @end
 
-@implementation TestDataSource : CPObject
+@implementation TestOutlineDataSource : CPObject
 {
     CPArray entries @accessors;
 }
@@ -267,6 +315,77 @@
         if (expectedSelectedItems)
             [tester assert:expectedSelectedItems[i] equals:item message:"in notification selected row #" + i];
     }
+}
+
+@end
+
+@implementation TestExpandCollapseVisibilityDelegate : CPObject
+{
+    id      tester @accessors;
+}
+
+- (void)outlineViewItemWillCollapse:(CPNotification)aNotification
+{
+    var anOutlineView = [aNotification object],
+        visibleRows = [anOutlineView rowsInRect:[anOutlineView visibleRect]];
+
+    [tester assertTrue:[anOutlineView isItemExpanded:".1"]];
+    [tester assert:0 equals:visibleRows.location];
+    [tester assert:8 equals:visibleRows.length];
+}
+
+- (void)outlineViewItemDidCollapse:(CPNotification)aNotification
+{
+    var anOutlineView = [aNotification object],
+        visibleRows = [anOutlineView rowsInRect:[anOutlineView visibleRect]];
+
+    [tester assertFalse:[anOutlineView isItemExpanded:".1"]];
+    [tester assert:0 equals:visibleRows.location];
+    [tester assert:4 equals:visibleRows.length];
+}
+
+- (void)outlineViewItemWillExpand:(CPNotification)aNotification
+{
+    var anOutlineView = [aNotification object],
+        visibleRows = [anOutlineView rowsInRect:[anOutlineView visibleRect]];
+
+    [tester assertFalse:[anOutlineView isItemExpanded:".1"]];
+    [tester assert:0 equals:visibleRows.location];
+    [tester assert:4 equals:visibleRows.length];
+}
+
+- (void)outlineViewItemDidExpand:(CPNotification)aNotification
+{
+    var anOutlineView = [aNotification object],
+        visibleRows = [anOutlineView rowsInRect:[anOutlineView visibleRect]];
+
+    [tester assertTrue:[anOutlineView isItemExpanded:".1"]];
+    [tester assert:0 equals:visibleRows.location];
+    [tester assert:8 equals:visibleRows.length];
+}
+@end
+
+@implementation TestShouldExpandItemDelegate : CPObject
+{
+}
+
+- (BOOL)outlineView:(CPOutlineView)outlineView shouldExpandItem:(id)item
+{
+    if (item == @".1")
+        return NO;
+    return YES;
+}
+@end
+
+@implementation TestShouldCollapseItemDelegate : CPObject
+{
+}
+
+- (BOOL)outlineView:(CPOutlineView)outlineView shouldCollapseItem:(id)item
+{
+    if (item == @".1")
+        return NO;
+    return YES;
 }
 
 @end

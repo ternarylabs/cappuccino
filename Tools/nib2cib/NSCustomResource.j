@@ -25,7 +25,16 @@
 
 @import <AppKit/_CPCibCustomResource.j>
 
-var FILE = require("file");
+@import "Nib2CibException.j"
+
+@global CP_NSMapClassName
+
+var FILE = require("file"),
+    imageSize = require("cappuccino/imagesize").imagesize,
+    supportedTemplateImages = [
+        "NSAddTemplate",
+        "NSRemoveTemplate"
+    ];
 
 @implementation _CPCibCustomResource (NSCoding)
 
@@ -38,34 +47,70 @@ var FILE = require("file");
         _className = CP_NSMapClassName([aCoder decodeObjectForKey:@"NSClassName"]);
         _resourceName = [aCoder decodeObjectForKey:@"NSResourceName"];
 
-        var size = CGSizeMakeZero();
+        var size = CGSizeMakeZero(),
+            framework = @"",
+            bundleIdentifier = @"";
 
         if (_resourceName == "NSSwitch")
             return nil;
-        else if (_resourceName == "NSAddTemplate" || _resourceName == "NSRemoveTemplate")
+        else if (/^NS[A-Z][A-Za-z]+$/.test(_resourceName))
         {
-            // Defer resolving this path until runtime.
-            _resourceName = _resourceName.replace("NS", "CP");
-        }
-        else if (![[aCoder resourcesPath] length])
-        {
-            CPLog.warn("Resources found in nib, but no resources path specified with -R option.");
+            if (supportedTemplateImages.indexOf(_resourceName) >= 0)
+            {
+                // Defer resolving this path until runtime.
+                _resourceName = _resourceName.replace("NS", "CP");
+            }
+            else
+                [CPException raise:Nib2CibException format:@"The built in image “%@” is not supported.", _resourceName];
         }
         else
         {
-            var resourcePath = [aCoder resourcePathForName:_resourceName];
+            var match = /^(.+)@(.+)$/.exec(_resourceName);
 
-            if (!resourcePath)
-                CPLog.warn("Resource \"" + _resourceName + "\" not found in the resources path: " + [aCoder resourcesPath]);
+            if (match)
+            {
+                _resourceName = match[1];
+                framework = match[2];
+            }
+
+            var resourceInfo = [aCoder resourceInfoForName:_resourceName inFramework:framework];
+
+            if (!resourceInfo)
+                CPLog.warn("Resource \"" + _resourceName + "\" not found in the Resources directories");
             else
-                size = imageSize(FILE.canonical(resourcePath));
+            {
+                size = imageSize(FILE.canonical(resourceInfo.path)) || CGSizeMakeZero();
+                framework = resourceInfo.framework;
+            }
 
             // Account for the fact that an extension may have been inferred.
-            if (resourcePath && FILE.extension(resourcePath) !== FILE.extension(_resourceName))
-                _resourceName += FILE.extension(resourcePath);
+            if (resourceInfo && resourceInfo.path)
+            {
+                // Include subdirectories in the name
+                match = /^.+\/Resources\/(.+)$/.exec(resourceInfo.path)
+                _resourceName = match[1];
+            }
         }
 
-        _properties = [CPDictionary dictionaryWithObject:size forKey:@"size"];
+        if (resourceInfo && resourceInfo.path && resourceInfo.framework)
+        {
+            var frameworkPath = FILE.dirname(FILE.dirname(resourceInfo.path)),
+                bundle = [CPBundle bundleWithPath:frameworkPath];
+
+            [bundle loadWithDelegate:nil];
+            bundleIdentifier = [bundle bundleIdentifier] || @"";
+        }
+
+        _properties = @{ @"size":size, @"bundleIdentifier":bundleIdentifier, @"framework":framework };
+
+        CPLog.debug("    Resource: %s\n   Framework: %s%s\n        Path: %s\n        Size: %d x %d",
+                    _resourceName,
+                    framework ? framework : "<none>",
+                    bundleIdentifier ? " (" + bundleIdentifier + ")" :
+                                        framework ? " (<no bundle identifier>)" : "",
+                    resourceInfo ? FILE.canonical(resourceInfo.path) : "",
+                    size.width,
+                    size.height);
     }
 
     return self;
@@ -73,8 +118,6 @@ var FILE = require("file");
 
 @end
 
-var ImageUtility = require("cappuccino/image-utility"),
-    imageSize = ImageUtility.sizeOfImageAtPath;
 
 @implementation NSCustomResource : _CPCibCustomResource
 {

@@ -78,22 +78,29 @@ var CPRuleEditorCustomControlClass = @"CPRuleEditorCustomControlClass";
  (1) CPMenuItem: not implemented yet.
 */
 
-- (id)ruleEditor:(CPRuleEditor)editor displayValueForCriterion:(id)criterion inRow:(int)row
+- (id)ruleEditor:(CPRuleEditor)editor displayValueForCriterion:(id)criterion inRow:(CPInteger)row
 {
     var custom_control_class = [criterion objectForKey:CPRuleEditorCustomControlClass];
 
     if (custom_control_class != nil)
     {
-        var custom_class = CPClassFromString(custom_control_class);
-        return [[custom_class alloc] initWithFrame:CGRectMake(0, 0, 100, 18)];
+        var control = [criterion objectForKey:("control_"+row)];
+        if (control == nil)
+        {
+            var custom_class = CPClassFromString(custom_control_class);
+            control = [[custom_class alloc] initWithFrame:CGRectMake(0, 0, 100, 18)];
+            [criterion setObject:control forKey:("control_"+row)];
+        }
+
+        return control;
     }
 
     return [criterion objectForKey:@"valeur"];
 }
 
-- (CPDictionary)ruleEditor:(CPRuleEditor)editor predicatePartsForCriterion:(id)criterion withDisplayValue:(id)value inRow:(int)row
+- (CPDictionary)ruleEditor:(CPRuleEditor)editor predicatePartsForCriterion:(id)criterion withDisplayValue:(id)value inRow:(CPInteger)row
 {
-    var predicatePartsForCriterion = [CPDictionary dictionary];
+    var predicatePartsForCriterion = @{};
 
     if ([editor rowTypeForRow:row] == CPRuleEditorRowTypeCompound)
     {

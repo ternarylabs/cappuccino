@@ -23,7 +23,7 @@
 
 - (void)awakeFromCib
 {
-    [[self mainWindow] setFullBridge:YES];
+    [[self mainWindow] setFullPlatformWindow:YES];
 
     orders = [];
     [orders addObject:[Order orderWithCustomer:[Customer customerWithName:@"Klaas Pieter" email:@"klaaspieter@madebysofa.com" job:@"Programmer"]]];
@@ -55,7 +55,7 @@
 //     return [[[self ordersArrayController] arrangedObjects] count];
 // }
 //
-// - (id)tableView:(CPTableView)theTableView objectValueForTableColumn:(CPTableColumn)theColumn row:(int)theRow
+// - (id)tableView:(CPTableView)theTableView objectValueForTableColumn:(CPTableColumn)theColumn row:(CPInteger)theRow
 // {
 //     var order = [[[self ordersArrayController] arrangedObjects] objectAtIndex:theRow];
 //     return [[order customer] valueForKey:[theColumn identifier]];

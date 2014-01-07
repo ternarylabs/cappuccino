@@ -33,7 +33,6 @@
 @import "_CPCibProxyObject.j"
 @import "_CPCibWindowTemplate.j"
 
-
 CPCibOwner              = @"CPCibOwner";
 CPCibTopLevelObjects    = @"CPCibTopLevelObjects";
 CPCibReplacementClasses = @"CPCibReplacementClasses";
@@ -61,6 +60,10 @@ var CPCibObjectDataKey  = @"CPCibObjectDataKey";
     if (self)
     {
         _data = [CPURLConnection sendSynchronousRequest:[CPURLRequest requestWithURL:aURL] returningResponse:nil];
+
+        if (!_data)
+            return nil;
+
         _awakenCustomResources = YES;
     }
 
@@ -162,7 +165,14 @@ var CPCibObjectDataKey  = @"CPCibObjectDataKey";
 
 - (BOOL)instantiateCibWithOwner:(id)anOwner topLevelObjects:(CPArray)topLevelObjects
 {
-    return [self instantiateCibWithExternalNameTable:[CPDictionary dictionaryWithObjectsAndKeys:anOwner, CPCibOwner, topLevelObjects, CPCibTopLevelObjects]];
+    // anOwner can be nil, and we can't store nil in a dictionary. If we leave it out,
+    // anyone who asks for CPCibOwner will get nil back.
+    var nameTable = @{ CPCibTopLevelObjects: topLevelObjects };
+
+    if (anOwner)
+        [nameTable setObject:anOwner forKey:CPCibOwner];
+
+    return [self instantiateCibWithExternalNameTable:nameTable];
 }
 
 @end
@@ -192,6 +202,28 @@ var CPCibObjectDataKey  = @"CPCibObjectDataKey";
         [_loadDelegate cibDidFinishLoading:self];
 
     _loadDelegate = nil;
+}
+
+@end
+
+var CPCibDataFileKey = @"CPCibDataFileKey",
+    CPCibBundleIdentifierKey = @"CPCibBundleIdentifierKey";
+
+@implementation CPCib (CPCoding)
+
+- (id)initWithCoder:(CPCoder)aCoder
+{
+    self = [super init];
+
+    var base64 = [aCoder decodeObjectForKey:CPCibDataFileKey];
+    _data = [CPData dataWithBase64:base64];
+
+    return self;
+}
+
+- (void)encodeWithCoder:(CPCoder)aCoder
+{
+    [aCoder encodeObject:[_data base64] forKey:CPCibDataFileKey];
 }
 
 @end

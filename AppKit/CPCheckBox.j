@@ -44,12 +44,12 @@ CPCheckBoxImageOffset = 4.0;
     return @"check-box";
 }
 
-+ (Class)_binderClassForBinding:(CPString)theBinding
++ (Class)_binderClassForBinding:(CPString)aBinding
 {
-    if (theBinding === CPValueBinding)
+    if (aBinding === CPValueBinding)
         return [_CPCheckBoxValueBinder class];
 
-    return [super _binderClassForBinding:theBinding];
+    return [super _binderClassForBinding:aBinding];
 }
 
 - (id)initWithFrame:(CGRect)aFrame
@@ -92,6 +92,23 @@ CPCheckBoxImageOffset = 4.0;
 - (void)takeValueFromKeyPath:(CPString)aKeyPath ofObjects:(CPArray)objects
 {
     [self takeStateFromKeyPath:aKeyPath ofObjects:objects];
+}
+
+- (CPImage)image
+{
+    return [self currentValueForThemeAttribute:@"image"];
+}
+
+- (CPImage)alternateImage
+{
+    return [self currentValueForThemeAttribute:@"image"];
+}
+
+- (BOOL)startTrackingAt:(CGPoint)aPoint
+{
+    var startedTracking = [super startTrackingAt:aPoint];
+    [self highlight:YES];
+    return startedTracking;
 }
 
 @end

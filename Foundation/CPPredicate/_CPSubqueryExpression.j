@@ -21,8 +21,8 @@
 
 @import "CPArray.j"
 @import "CPDictionary.j"
-@import "CPExpression.j"
-@import "CPPredicate.j"
+@import "_CPExpression.j"
+@import "_CPPredicate.j"
 
 @implementation _CPSubqueryExpression : CPExpression
 {
@@ -55,7 +55,7 @@
     var collection = [_collection expressionValueWithObject:object context:context],
         count = [collection count],
         result = [CPArray array],
-        bindings = [CPDictionary dictionaryWithObject:[CPExpression expressionForEvaluatedObject] forKey:[self variable]],
+        bindings = @{ [self variable]: [CPExpression expressionForEvaluatedObject] },
         i = 0;
 
     for (; i < count; i++)
@@ -73,7 +73,7 @@
     if (self === object)
         return YES;
 
-    if (object.isa !== self.isa || ![_collection isEqual:[object collection]] || ![_variableExpression isEqual:[object variableExpression]] || ![_subpredicate isEqual:[object predicate]])
+    if (object === nil || object.isa !== self.isa || ![_collection isEqual:[object collection]] || ![_variableExpression isEqual:[object variableExpression]] || ![_subpredicate isEqual:[object predicate]])
         return NO;
 
     return YES;

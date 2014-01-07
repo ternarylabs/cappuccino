@@ -10,6 +10,7 @@ tableTestDragType = @"CPTableViewTestDragType";
     CPImage     iconImage;
     CPArray     dataSet1;
     CPArray     dataSet2;
+    CPArray     dataSet3;
 
     CPTableColumn randomColumn;
 }
@@ -28,9 +29,15 @@ tableTestDragType = @"CPTableViewTestDragType";
     }
 
     var theWindow = [[CPWindow alloc] initWithContentRect:CGRectMake(50,50,700,500) styleMask:CPClosableWindowMask],
-        contentView = [theWindow contentView];
+        contentView = [theWindow contentView],
+        label = [CPTextField new];
 
-    tableView = [[CPTableView alloc] initWithFrame:CGRectMake(0.0, 0.0, 400.0, 400.0)];
+    [label setStringValue:@"This table refuses to become the first responder but can still be interacted with."];
+    [label sizeToFit];
+    [label setFrameOrigin:CGPointMake(200, 10)]
+    [contentView addSubview:label];
+
+    tableView = [[CUTableView alloc] initWithFrame:CGRectMake(0.0, 0.0, 400.0, 400.0)];
 
     [tableView setAllowsMultipleSelection:YES];
     [tableView setAllowsColumnSelection:YES];
@@ -46,16 +53,18 @@ tableTestDragType = @"CPTableViewTestDragType";
     [tableView setDataSource:self];
 
     var iconView = [[CPImageView alloc] initWithFrame:CGRectMake(16, 16, 0, 0)];
-    [iconView setImageScaling:CPScaleNone];
+    [iconView setImageScaling:CPImageScaleNone];
+
     var iconColumn = [[CPTableColumn alloc] initWithIdentifier:"icons"];
     [iconColumn setWidth:32.0];
     [iconColumn setMinWidth:32.0];
     [iconColumn setDataView:iconView];
     [tableView addTableColumn:iconColumn];
-    iconImage = [[CPImage alloc] initWithContentsOfFile:"http://cappuccino.org/images/favicon.png" size:CGSizeMake(16,16)];
+    iconImage = [[CPImage alloc] initWithContentsOfFile:"http://cappuccino-project.org/images/favicon.png" size:CGSizeMake(16,16)];
 
 
     var desc = [CPSortDescriptor sortDescriptorWithKey:@"self" ascending:YES];
+
     for (var i = 1; i <= 5; i++)
     {
         var column = [[CPTableColumn alloc] initWithIdentifier:String(i)];
@@ -72,6 +81,9 @@ tableTestDragType = @"CPTableViewTestDragType";
         if (i === 2)
             randomColumn = column;
     }
+
+    [tableView setAutosaveTableColumns:YES];
+    [tableView setAutosaveName:@"TableTest"];
 
     // we offset this scrollview to make sure all the coordinates are calculated correctly
     // bad things can happen when the tableview doesn't sit at (0,0)
@@ -172,7 +184,6 @@ tableTestDragType = @"CPTableViewTestDragType";
 
 - (void)newWindow
 {
-
     var window2 = [[CPWindow alloc] initWithContentRect:CGRectMake(450, 50, 500, 400) styleMask:CPTitledWindowMask | CPResizableWindowMask];
 
     tableView2 = [[CPTableView alloc] initWithFrame:CGRectMake(0.0, 0.0, 500.0, 500.0)];
@@ -186,7 +197,6 @@ tableTestDragType = @"CPTableViewTestDragType";
     [tableView2 setDelegate:self];
     [tableView2 setDataSource:self];
 
-
     var checkBox = [[CPCheckBox alloc] initWithFrame:CGRectMake(5,3,24,24)],
         checkBoxColumn = [[CPTableColumn alloc] initWithIdentifier:@"checkBox"];
     [checkBoxColumn setDataView:checkBox];
@@ -194,6 +204,7 @@ tableTestDragType = @"CPTableViewTestDragType";
     [tableView2 addTableColumn:checkBoxColumn];
 
     var desc = [CPSortDescriptor sortDescriptorWithKey:@"self" ascending:YES];
+
     for (var i = 1; i <= 3; i++)
     {
         var column = [[CPTableColumn alloc] initWithIdentifier:String(i)];
@@ -276,7 +287,7 @@ tableTestDragType = @"CPTableViewTestDragType";
         return dataSet3.length;
 }
 
-- (id)tableView:(CPTableView)aTableView objectValueForTableColumn:(CPTableColumn)aColumn row:(int)aRow
+- (id)tableView:(CPTableView)aTableView objectValueForTableColumn:(CPTableColumn)aColumn row:(CPInteger)aRow
 {
     if ([aColumn identifier] === "icons")
         return iconImage;
@@ -299,20 +310,9 @@ tableTestDragType = @"CPTableViewTestDragType";
     [aTableView reloadData];
 }
 
-
-- (void)tableViewSelectionIsChanging:(CPNotification)aNotification
+- (BOOL)tableView:(CPTableView)aTableView shouldSelectRow:(CPInteger)rowIndex
 {
-    //CPLog.debug(@"changing! %@", [aNotification description]);
-}
-
-- (void)tableViewSelectionDidChange:(CPNotification)aNotification
-{
-    //CPLog.debug(@"did change! %@", [aNotification description]);
-}
-
-- (BOOL)tableView:(CPTableView)aTableView shouldSelectRow:(int)rowIndex
-{
-    //CPLog.debug(@"tableView:shouldSelectRow");
+    CPLog.debug(@"tableView:shouldSelectRow");
     return true;
 }
 
@@ -324,19 +324,20 @@ tableTestDragType = @"CPTableViewTestDragType";
 
 - (void)tableViewSelectionDidChange:(id)notification
 {
-    //CPLogConsole(_cmd + [notification description]);
+    CPLogConsole(_cmd + [notification description]);
 }
 
 - (void)tableViewSelectionIsChanging:(id)notification
 {
-    //CPLogConsole(_cmd + [notification description]);
+    CPLogConsole(_cmd + [notification description]);
 }
 
 - (void)_tableViewColumnDidResize:(id)notification
 {
-    //CPLogConsole(_cmd + [notification description]);
+    CPLogConsole(_cmd + [notification description]);
 }
-- (BOOL)tableView:(CPTableView)aTableView shouldEditTableColumn:(CPTableColumn)tableColumn row:(int)row
+
+- (BOOL)tableView:(CPTableView)aTableView shouldEditTableColumn:(CPTableColumn)tableColumn row:(CPInteger)row
 {
     if (aTableView === tableView3)
         return YES;
@@ -344,12 +345,12 @@ tableTestDragType = @"CPTableViewTestDragType";
         return NO;
 }
 
-- (void)tableView:(CPTableView)aTableView willDisplayView:(CPView)aView forTableColumn:(CPTableColumn)tableColumn row:(int)row
+- (void)tableView:(CPTableView)aTableView willDisplayView:(CPView)aView forTableColumn:(CPTableColumn)tableColumn row:(CPInteger)row
 {
     //CPLogConsole(_cmd + " column: " + [tableColumn identifier] + " row:" + row)
 }
 
-- (void)tableView:(CPTableView)aTableView setObjectValue:(id)aValue forTableColumn:(CPTableColumn)tableColumn row:(int)row
+- (void)tableView:(CPTableView)aTableView setObjectValue:(id)aValue forTableColumn:(CPTableColumn)tableColumn row:(CPInteger)row
 {
     if (aTableView === tableView3)
         dataSet3[row] = aValue;
@@ -395,7 +396,7 @@ tableTestDragType = @"CPTableViewTestDragType";
     return CPDragOperationMove;
 }
 
-- (BOOL)tableView:(CPTableView)aTableView acceptDrop:(id)info row:(int)row dropOperation:(CPTableViewDropOperation)operation
+- (BOOL)tableView:(CPTableView)aTableView acceptDrop:(id)info row:(CPInteger)row dropOperation:(CPTableViewDropOperation)operation
 {
     var pboard = [info draggingPasteboard],
         rowData = [pboard dataForType:tableTestDragType],
@@ -425,8 +426,8 @@ tableTestDragType = @"CPTableViewTestDragType";
         }
         else
         {
-            var destIndexes = [CPIndexSet indexSetWithIndexesInRange:CPMakeRange(row, [sourceIndexes count])];
-            var sourceObjects = [sourceDataSet objectsAtIndexes:sourceIndexes];
+            var destIndexes = [CPIndexSet indexSetWithIndexesInRange:CPMakeRange(row, [sourceIndexes count])],
+                sourceObjects = [sourceDataSet objectsAtIndexes:sourceIndexes];
 
             [destinationDataSet insertObjects:sourceObjects atIndexes:destIndexes];
             [destinationTable reloadData];
@@ -482,6 +483,19 @@ tableTestDragType = @"CPTableViewTestDragType";
 
         index = [indexes indexLessThanIndex:index];
     }
+}
+
+@end
+
+
+@implementation CUTableView : CPTableView
+{
+
+}
+
+- (BOOL)acceptsFirstResponder
+{
+    return NO;
 }
 
 @end

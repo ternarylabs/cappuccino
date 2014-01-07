@@ -23,7 +23,10 @@
 @import <Foundation/CPArray.j>
 
 @import "CPControl.j"
+@import "CPWindow_Constants.j"
+@import "_CPImageAndTextView.j"
 
+@global CPApp
 
 CPSegmentSwitchTrackingSelectOne = 0;
 CPSegmentSwitchTrackingSelectAny = 1;
@@ -53,10 +56,35 @@ CPSegmentSwitchTrackingMomentary = 2;
     return "segmented-control";
 }
 
-+ (id)themeAttributes
++ (CPDictionary)themeAttributes
 {
-    return [CPDictionary dictionaryWithObjects:[CPCenterTextAlignment, CPCenterVerticalTextAlignment, CPImageLeft, CPScaleNone, _CGInsetMakeZero(), _CGInsetMakeZero(), [CPNull null], [CPNull null], [CPNull null], [CPNull null], 1.0, 24.0]
-                                       forKeys:[@"alignment", @"vertical-alignment", @"image-position", @"image-scaling", @"bezel-inset", @"content-inset", @"left-segment-bezel-color", @"right-segment-bezel-color", @"center-segment-bezel-color", @"divider-bezel-color", @"divider-thickness", @"default-height"]];
+    return @{
+            @"alignment": CPCenterTextAlignment,
+            @"vertical-alignment": CPCenterVerticalTextAlignment,
+            @"image-position": CPImageLeft,
+            @"image-scaling": CPImageScaleNone,
+            @"bezel-inset": CGInsetMakeZero(),
+            @"content-inset": CGInsetMakeZero(),
+            @"left-segment-bezel-color": [CPNull null],
+            @"right-segment-bezel-color": [CPNull null],
+            @"center-segment-bezel-color": [CPNull null],
+            @"divider-bezel-color": [CPNull null],
+            @"divider-thickness": 1.0,
+            @"default-height": 24.0,
+        };
+}
+
++ (Class)_binderClassForBinding:(CPString)aBinding
+{
+    if ([self _isSelectionBinding:aBinding])
+        return [_CPSegmentedControlBinder class];
+
+    return [super _binderClassForBinding:aBinding];
+}
+
++ (BOOL)_isSelectionBinding:(CPString)aBinding
+{
+    return (aBinding === CPSelectedIndexBinding || aBinding === CPSelectedLabelBinding || aBinding === CPSelectedTagBinding);
 }
 
 - (id)initWithFrame:(CGRect)aRect
@@ -74,6 +102,19 @@ CPSegmentSwitchTrackingMomentary = 2;
     }
 
     return self;
+}
+
+- (void)bind:(CPString)aBinding toObject:(id)anObject withKeyPath:(CPString)aKeyPath options:(CPDictionary)options
+{
+    if ([[self class] _isSelectionBinding:aBinding] && _trackingMode !== CPSegmentSwitchTrackingSelectOne)
+        CPLog.warn("Binding " + aBinding + " needs CPSegmentSwitchTrackingSelectOne tracking mode");
+    else
+        [super bind:aBinding toObject:anObject withKeyPath:aKeyPath options:options];
+}
+
+- (void)_reverseSetBinding
+{
+    [_CPSegmentedControlBinder reverseSetValueForObject:self];
 }
 
 /*!
@@ -115,13 +156,15 @@ CPSegmentSwitchTrackingMomentary = 2;
     if (_selectedSegment >= _segments.length)
         _selectedSegment = -1;
 
-    // Make space for/remove space used by dividers.
     var thickness = [self currentValueForThemeAttribute:@"divider-thickness"],
-        delta = thickness * (dividersAfter - dividersBefore),
-        frame = [self frame];
+        frame = [self frame],
+        widthOfAllSegments = 0,
+        dividerExtraSpace = ([_segments count] - 1) * thickness;
 
-    if (delta)
-        [self setFrameSize:CGSizeMake(frame.size.width + delta, frame.size.height)];
+    for (var i = 0; i < [_segments count]; i++)
+        widthOfAllSegments += [_segments[i] width];
+
+    [self setFrameSize:CGSizeMake(widthOfAllSegments + dividerExtraSpace, frame.size.height)];
 
     [self tileWithChangedSegment:0];
 }
@@ -163,6 +206,21 @@ CPSegmentSwitchTrackingMomentary = 2;
 
     for (; index < _segments.length; ++index)
         if (_segments[index].tag == aTag)
+        {
+            [self setSelectedSegment:index];
+
+            return YES;
+        }
+
+    return NO;
+}
+
+- (BOOL)_selectSegmentWithLabel:(CPString)aLabel
+{
+    var index = 0;
+
+    for (; index < _segments.length; ++index)
+        if (_segments[index].label == aLabel)
         {
             [self setSelectedSegment:index];
 
@@ -366,11 +424,14 @@ CPSegmentSwitchTrackingMomentary = 2;
     @param aSegment the segment to enable/disable
     @throws CPRangeException if \c aSegment is out of bounds
 */
-- (void)setEnabled:(BOOL)isEnabled forSegment:(unsigned)aSegment
+- (void)setEnabled:(BOOL)shouldBeEnabled forSegment:(unsigned)aSegment
 {
-    [_segments[aSegment] setEnabled:isEnabled];
+    if ([_segments[aSegment] enabled] === shouldBeEnabled)
+        return;
 
-    if (isEnabled)
+    [_segments[aSegment] setEnabled:shouldBeEnabled];
+
+    if (shouldBeEnabled)
         _themeStates[aSegment] &= ~CPThemeStateDisabled;
     else
         _themeStates[aSegment] |= CPThemeStateDisabled;
@@ -460,7 +521,7 @@ CPSegmentSwitchTrackingMomentary = 2;
     }
     else if (aName === "right-segment-bezel")
     {
-        return CPRectMake(CGRectGetWidth([self bounds]) - contentInset.right,
+        return CGRectMake(CGRectGetWidth([self bounds]) - contentInset.right,
                             bezelInset.top,
                             contentInset.right,
                             height);
@@ -503,9 +564,9 @@ CPSegmentSwitchTrackingMomentary = 2;
 - (CPView)createEphemeralSubviewNamed:(CPString)aName
 {
     if ([aName hasPrefix:@"segment-content"])
-        return [[_CPImageAndTextView alloc] initWithFrame:_CGRectMakeZero()];
+        return [[_CPImageAndTextView alloc] initWithFrame:CGRectMakeZero()];
 
-    return [[CPView alloc] initWithFrame:_CGRectMakeZero()];
+    return [[CPView alloc] initWithFrame:CGRectMakeZero()];
 }
 
 - (void)layoutSubviews
@@ -796,6 +857,7 @@ CPSegmentSwitchTrackingMomentary = 2;
             return;
 
         var highlighted = [self testSegment:location] === _trackingSegment;
+
         if (highlighted != _trackingHighlighted)
         {
             _trackingHighlighted = highlighted;
@@ -882,6 +944,74 @@ var CPSegmentedControlSegmentsKey       = "CPSegmentedControlSegmentsKey",
 
 @end
 
+var CPSegmentedControlBindersMap = {},
+    CPSegmentedControlNoSelectionPlaceholder = "CPSegmentedControlNoSelectionPlaceholder";
+
+@implementation _CPSegmentedControlBinder : CPBinder
+{
+    CPString _selectionBinding @accessors(readonly, getter=selectionBinding);
+}
+
++ (void)reverseSetValueForObject:(id)aSource
+{
+    var binder = CPSegmentedControlBindersMap[[aSource UID]];
+    [binder reverseSetValueFor:[binder selectionBinding]];
+}
+
+- (id)initWithBinding:(CPString)aBinding name:(CPString)aName to:(id)aDestination keyPath:(CPString)aKeyPath options:(CPDictionary)options from:(id)aSource
+{
+    self = [super initWithBinding:aBinding name:aName to:aDestination keyPath:aKeyPath options:options from:aSource];
+
+    if (self)
+    {
+        CPSegmentedControlBindersMap[[aSource UID]] = self;
+        _selectionBinding = aName;
+    }
+
+    return self;
+}
+
+- (void)_updatePlaceholdersWithOptions:(CPDictionary)options
+{
+    [super _updatePlaceholdersWithOptions:options];
+
+    [self _setPlaceholder:CPSegmentedControlNoSelectionPlaceholder forMarker:CPMultipleValuesMarker isDefault:YES];
+    [self _setPlaceholder:CPSegmentedControlNoSelectionPlaceholder forMarker:CPNoSelectionMarker isDefault:YES];
+    [self _setPlaceholder:CPSegmentedControlNoSelectionPlaceholder forMarker:CPNotApplicableMarker isDefault:YES];
+    [self _setPlaceholder:CPSegmentedControlNoSelectionPlaceholder forMarker:CPNullMarker isDefault:YES];
+}
+
+- (void)setPlaceholderValue:(id)aValue withMarker:(CPString)aMarker forBinding:(CPString)aBinding
+{
+    if (aValue == CPSegmentedControlNoSelectionPlaceholder)
+        [_source setSelected:NO forSegment:[_source selectedSegment]];
+    else
+        [self setValue:aValue forBinding:aBinding];
+}
+
+- (void)setValue:(id)aValue forBinding:(CPString)aBinding
+{
+    if (aBinding == CPSelectedIndexBinding)
+        [_source setSelectedSegment:aValue];
+    else if (aBinding == CPSelectedTagBinding)
+        [_source selectSegmentWithTag:aValue];
+    else if (aBinding == CPSelectedLabelBinding)
+        [_source _selectSegmentWithLabel:aValue];
+}
+
+- (id)valueForBinding:(CPString)aBinding
+{
+    var selectedIndex = [_source selectedSegment];
+
+    if (aBinding == CPSelectedIndexBinding)
+        return selectedIndex;
+    else if (aBinding == CPSelectedTagBinding)
+        return [_source tagForSegment:selectedIndex];
+    else if (aBinding == CPSelectedLabelBinding)
+        return [_source labelForSegment:selectedIndex];
+}
+
+@end
 
 @implementation _CPSegmentItem : CPObject
 {

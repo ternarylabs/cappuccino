@@ -92,6 +92,29 @@
     }];
 }
 
+- (void)test_removeObject_
+{
+    var arrayClass = [[self class] arrayClass],
+        a = [CPDate distantFuture],
+        b = [a copy],
+        c = [CPDate distantPast],
+        array = [arrayClass arrayWithObjects:a, b, a, c, b];
+
+    [array removeObject:a];
+    [self assert:array equals:[arrayClass arrayWithObjects:c]];
+}
+
+- (void)test_removeObjectIdenticalTo_
+{
+    var arrayClass = [[self class] arrayClass],
+        a = [CPDate distantFuture],
+        b = [a copy],
+        array = [arrayClass arrayWithObjects:a, b, a, b, b];
+
+    [array removeObjectIdenticalTo:b];
+    [self assert:array equals:[arrayClass arrayWithObjects:a, a]];
+}
+
 - (void)test_removeObjectsAtIndexes_
 {
     var arrayClass = [[self class] arrayClass],
@@ -380,11 +403,11 @@
 
     [pretty sortUsingDescriptors:[[[CPSortDescriptor alloc] initWithKey:@"value" ascending:NO]]];
 
-    [self assert:"(\n\t3:d, \n\t2:c, \n\t1:b, \n\t0:a\n)" equals:[pretty description]];
+    [self assert:"@[\n    3:d,\n    2:c,\n    1:b,\n    0:a\n]" equals:[pretty description]];
 
     [pretty sortUsingDescriptors:[[[CPSortDescriptor alloc] initWithKey:@"value" ascending:YES]]];
 
-    [self assert:"(\n\t0:a, \n\t1:b, \n\t2:c, \n\t3:d\n)" equals:[pretty description]]
+    [self assert:"@[\n    0:a,\n    1:b,\n    2:c,\n    3:d\n]" equals:[pretty description]];
 }
 
 - (void)testThatCPArrayDoesSortUsingTwoDescriptors
@@ -447,13 +470,30 @@
     [self assert:[5, 4, 4, 3, 2, 2, 1, 1, 1, 1] equals:target];
 }
 
+- (void)testThatCPArrayDoesSortCorrectlyWithNilAndCPNull
+{
+    var descriptors = [[CPSortDescriptor sortDescriptorWithKey:@"number" ascending:NO]],
+        target = [
+            [[CPPrettyObject alloc] initWithValue:@"a" number:nil],
+            [[CPPrettyObject alloc] initWithValue:@"a" number:[CPNull null]],
+            [[CPPrettyObject alloc] initWithValue:@"a" number:@"Objective-J"],
+            [[CPPrettyObject alloc] initWithValue:@"a" number:[CPNull null]],
+            [[CPPrettyObject alloc] initWithValue:@"a" number:nil],
+        ];
+
+    [target sortUsingDescriptors:descriptors];
+
+    [self assert:@"Objective-J" equals:[target[0] number]];
+    [self assert:nil equals:[target[1] number]];
+    [self assert:[CPNull null] equals:[target[2] number]];
+    [self assert:[CPNull null] equals:[target[3] number]];
+    [self assert:nil equals:[target[4] number]];
+}
+
 - (void)testMutableCopy
 {
-    var normalArray = [CPArray array];
-
-    [self assertThrows:function () { [array addObject:[CPNull null]] }];
-
-    var mutableArray = [normalArray mutableCopy];
+    var normalArray = [],
+        mutableArray = [normalArray mutableCopy];
 
     [mutableArray addObject:[CPNull null]];
 

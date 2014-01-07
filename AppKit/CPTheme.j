@@ -21,9 +21,11 @@
  */
 
 @import <Foundation/CPObject.j>
+@import <Foundation/CPMutableArray.j>
 @import <Foundation/CPString.j>
 @import <Foundation/CPKeyedUnarchiver.j>
 
+@class CPView
 
 var CPThemesByName          = { },
     CPThemeDefaultTheme     = nil,
@@ -83,7 +85,7 @@ var CPThemesByName          = { },
     if (self)
     {
         _name = aName;
-        _attributes = [CPDictionary dictionary];
+        _attributes = @{};
 
         CPThemesByName[_name] = self;
     }
@@ -145,7 +147,7 @@ var CPThemesByName          = { },
                 className = [aClass defaultThemeClass];
             else if ([aClass respondsToSelector:@selector(themeClass)])
             {
-                CPLog.warn(@"%@ themeClass is deprecated in favor of defaultThemeClass",CPStringFromClass([anObject class]));
+                CPLog.warn(@"%@ themeClass is deprecated in favor of defaultThemeClass", CPStringFromClass(aClass));
                 className = [aClass themeClass];
             }
             else
@@ -268,7 +270,7 @@ var CPThemesByName          = { },
 
     if (!attributes)
     {
-        attributes = [CPDictionary dictionary];
+        attributes = @{};
 
         [_attributes setObject:attributes forKey:aClass];
     }
@@ -402,22 +404,25 @@ function CPThemeStateName(aState)
     return name;
 }
 
-CPThemeStateNames[0]        = "normal";
-CPThemeStateNormal          = CPThemeStates["normal"] = 0;
-CPThemeStateDisabled        = CPThemeState("disabled");
-CPThemeStateHovered         = CPThemeState("hovered");
-CPThemeStateHighlighted     = CPThemeState("highlighted");
-CPThemeStateSelected        = CPThemeState("selected");
-CPThemeStateTableDataView   = CPThemeState("tableDataView");
-CPThemeStateSelectedDataView = CPThemeStateSelectedTableDataView = CPThemeState("selectedTableDataView");
-CPThemeStateGroupRow        = CPThemeState("CPThemeStateGroupRow");
-CPThemeStateBezeled         = CPThemeState("bezeled");
-CPThemeStateBordered        = CPThemeState("bordered");
-CPThemeStateEditable        = CPThemeState("editable");
-CPThemeStateEditing         = CPThemeState("editing");
-CPThemeStateVertical        = CPThemeState("vertical");
-CPThemeStateDefault         = CPThemeState("default");
-CPThemeStateCircular        = CPThemeState("circular");
+CPThemeStateNames[0]         = "normal";
+CPThemeStateNormal           = CPThemeStates["normal"] = 0;
+CPThemeStateDisabled         = CPThemeState("disabled");
+CPThemeStateHovered          = CPThemeState("hovered");
+CPThemeStateHighlighted      = CPThemeState("highlighted");
+CPThemeStateSelected         = CPThemeState("selected");
+CPThemeStateTableDataView    = CPThemeState("tableDataView");
+CPThemeStateSelectedDataView = CPThemeState("selectedTableDataView");
+CPThemeStateGroupRow         = CPThemeState("CPThemeStateGroupRow");
+CPThemeStateBezeled          = CPThemeState("bezeled");
+CPThemeStateBordered         = CPThemeState("bordered");
+CPThemeStateEditable         = CPThemeState("editable");
+CPThemeStateEditing          = CPThemeState("editing");
+CPThemeStateVertical         = CPThemeState("vertical");
+CPThemeStateDefault          = CPThemeState("default");
+CPThemeStateCircular         = CPThemeState("circular");
+CPThemeStateAutocompleting   = CPThemeState("autocompleting");
+CPThemeStateMainWindow       = CPThemeState("mainWindow");
+CPThemeStateKeyWindow        = CPThemeState("keyWindow");
 
 @implementation _CPThemeAttribute : CPObject
 {
@@ -426,7 +431,7 @@ CPThemeStateCircular        = CPThemeState("circular");
     CPDictionary        _values @accessors(readonly, getter=values);
 
     JSObject            _cache;
-    _CPThemeAttribute   _parentAttribute;
+    _CPThemeAttribute   _themeDefaultAttribute;
 }
 
 - (id)initWithName:(CPString)aName defaultValue:(id)aDefaultValue
@@ -438,7 +443,7 @@ CPThemeStateCircular        = CPThemeState("circular");
         _cache = { };
         _name = aName;
         _defaultValue = aDefaultValue;
-        _values = [CPDictionary dictionary];
+        _values = @{};
     }
 
     return self;
@@ -469,9 +474,9 @@ CPThemeStateCircular        = CPThemeState("circular");
     _cache = {};
 
     if (aValue === undefined || aValue === nil)
-        _values = [CPDictionary dictionary];
+        _values = @{};
     else
-        _values = [CPDictionary dictionaryWithObject:aValue forKey:String(CPThemeStateNormal)];
+        _values = @{ String(CPThemeStateNormal): aValue };
 }
 
 - (void)setValue:(id)aValue forState:(CPThemeState)aState
@@ -537,10 +542,17 @@ CPThemeStateCircular        = CPThemeState("circular");
     }
 
     if (value === undefined || value === nil)
-        value = [_parentAttribute valueForState:aState];
+        value = [_themeDefaultAttribute valueForState:aState];
 
     if (value === undefined || value === nil)
+    {
         value = _defaultValue;
+
+        // Class theme attributes cannot use nil because it's a dictionary.
+        // So transform CPNull into nil.
+        if (value === [CPNull null])
+            value = nil;
+    }
 
     _cache[aState] = value;
 
@@ -549,11 +561,11 @@ CPThemeStateCircular        = CPThemeState("circular");
 
 - (void)setParentAttribute:(_CPThemeAttribute)anAttribute
 {
-    if (_parentAttribute === anAttribute)
+    if (_themeDefaultAttribute === anAttribute)
         return;
 
     _cache = { };
-    _parentAttribute = anAttribute;
+    _themeDefaultAttribute = anAttribute;
 }
 
 - (_CPThemeAttribute)attributeMergedWithAttribute:(_CPThemeAttribute)anAttribute
@@ -580,7 +592,7 @@ CPThemeStateCircular        = CPThemeState("circular");
 
         _name = [aCoder decodeObjectForKey:@"name"];
         _defaultValue = [aCoder decodeObjectForKey:@"defaultValue"];
-        _values = [CPDictionary dictionary];
+        _values = @{};
 
         if ([aCoder containsValueForKey:@"value"])
         {
@@ -628,7 +640,7 @@ CPThemeStateCircular        = CPThemeState("circular");
     }
     else
     {
-        var encodedValues = [CPDictionary dictionary];
+        var encodedValues = @{};
 
         while (count--)
         {

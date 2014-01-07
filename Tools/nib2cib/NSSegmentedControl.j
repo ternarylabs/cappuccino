@@ -22,6 +22,11 @@
 
 @import <AppKit/CPSegmentedControl.j>
 
+@import "NSCell.j"
+
+@class Nib2Cib
+
+
 @implementation CPSegmentedControl (CPCoding)
 
 - (id)NS_initWithCoder:(CPCoder)aCoder
@@ -29,39 +34,45 @@
     _segments = [];
     _themeStates = [];
 
-    if (self = [super NS_initWithCoder:aCoder])
+    return [super NS_initWithCoder:aCoder];
+}
+
+- (void)NS_initWithCell:(NSCell)cell
+{
+    [super NS_initWithCell:cell];
+
+    var frame = [self frame],
+        originalWidth = frame.size.width;
+
+    frame.size.width = 0;
+    frame.origin.x = MAX(frame.origin.x - 4.0, 0.0);
+
+    [self setFrame:frame];
+
+    _segments           = [cell segments];
+    _selectedSegment    = [cell selectedSegment];
+    _segmentStyle       = [cell segmentStyle];
+    _trackingMode       = [cell trackingMode];
+
+    [self setValue:CPCenterTextAlignment forThemeAttribute:@"alignment"];
+
+    // HACK
+
+    for (var i = 0; i < _segments.length; i++)
     {
-        var frame = [self frame],
-            originalWidth = frame.size.width;
+        _themeStates[i] = _segments[i].selected ? CPThemeStateSelected : CPThemeStateNormal;
 
-        frame.size.width = 0;
-        frame.origin.x = MAX(frame.origin.x - 4.0, 0.0);
-
-        [self setFrame:frame];
-
-        var cell = [aCoder decodeObjectForKey:"NSCell"];
-
-        _segments           = [cell segments];
-        _selectedSegment    = [cell selectedSegment];
-        _segmentStyle       = [cell segmentStyle];
-        _trackingMode       = [cell trackingMode];
-
-        [self setValue:CPCenterTextAlignment forThemeAttribute:@"alignment"];
-
-        // HACK
-
-        for (var i = 0; i < _segments.length; i++)
-        {
-            _themeStates[i] = _segments[i].selected ? CPThemeStateSelected : CPThemeStateNormal;
-
-            [self tileWithChangedSegment:i];
-        }
-
-        frame.size.width = originalWidth;
-        [self setFrame:frame];
+        [self tileWithChangedSegment:i];
     }
 
-    return self;
+    // Adjust for differences between Cocoa and Cappuccino widget framing.
+    frame.origin.x += 6;
+
+    if ([[Nib2Cib defaultTheme] name] == @"Aristo2")
+        frame.size.height += 1;
+
+    frame.size.width = originalWidth;
+    [self setFrame:frame];
 }
 
 @end
@@ -72,7 +83,15 @@
 
 - (id)initWithCoder:(CPCoder)aCoder
 {
-    return [self NS_initWithCoder:aCoder];
+    self = [self NS_initWithCoder:aCoder];
+
+    if (self)
+    {
+        var cell = [aCoder decodeObjectForKey:@"NSCell"];
+        [self NS_initWithCell:cell];
+    }
+
+    return self;
 }
 
 - (Class)classForKeyedArchiver
@@ -95,9 +114,13 @@
     if (self = [super initWithCoder:aCoder])
     {
         _segments           = [aCoder decodeObjectForKey:"NSSegmentImages"];
-        _selectedSegment    = [aCoder decodeIntForKey:"NSSelectedSegment"] || -1;
+        _selectedSegment    = [aCoder decodeObjectForKey:"NSSelectedSegment"];
+
+        if (_selectedSegment === nil)
+            _selectedSegment = -1;
+
         _segmentStyle       = [aCoder decodeIntForKey:"NSSegmentStyle"];
-        _trackingMode       = [aCoder decodeIntForKey:"NSTrackingMode"] || CPSegmentSwitchTrackingSelectOne;
+        _trackingMode       = [aCoder decodeIntForKey:"NSTrackingMode"];
 
         if (_trackingMode == CPSegmentSwitchTrackingSelectOne && _selectedSegment == -1)
             _selectedSegment = 0;

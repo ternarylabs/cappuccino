@@ -25,6 +25,10 @@
 
 @import "CPDocument.j"
 @import "CPOpenPanel.j"
+@import "CPMenuItem.j"
+@import "CPWindowController.j"
+
+@global CPApp
 
 
 var CPSharedDocumentController = nil;
@@ -124,7 +128,7 @@ var CPSharedDocumentController = nil;
     @param anError not used
     @return the created document
 */
-- (CPDocument)makeUntitledDocumentOfType:(CPString)aType error:({CPError})anError
+- (CPDocument)makeUntitledDocumentOfType:(CPString)aType error:(/*{*/CPError/*}*/)anError
 {
     return [[[self documentClassForType:aType] alloc] initWithType:aType error:anError];
 }
@@ -144,7 +148,7 @@ var CPSharedDocumentController = nil;
     {
         var type = [self typeForContentsOfURL:anAbsoluteURL error:anError];
 
-        result = [self makeDocumentWithContentsOfURL:anAbsoluteURL ofType:type delegate:self didReadSelector:@selector(document:didRead:contextInfo:) contextInfo:[CPDictionary dictionaryWithObject:shouldDisplay forKey:@"shouldDisplay"]];
+        result = [self makeDocumentWithContentsOfURL:anAbsoluteURL ofType:type delegate:self didReadSelector:@selector(document:didRead:contextInfo:) contextInfo:@{ @"shouldDisplay": shouldDisplay }];
 
         [self addDocument:result];
 
@@ -250,6 +254,14 @@ var CPSharedDocumentController = nil;
 }
 
 /*!
+    Returns the CPDocument object associated with the main window.
+*/
+- (CPDocument)currentDocument
+{
+    return [[[CPApp mainWindow] windowController] document];
+}
+
+/*!
     Adds \c aDocument under the control of the receiver.
     @param aDocument the document to add
 */
@@ -265,6 +277,33 @@ var CPSharedDocumentController = nil;
 - (void)removeDocument:(CPDocument)aDocument
 {
     [_documents removeObjectIdenticalTo:aDocument];
+}
+
+/*!
+    Returns the document object whose window controller
+    owns a specified window.
+*/
+- (CPDocument)documentForWindow:(CPWindow)aWindow
+{
+   return [[aWindow windowController] document];
+}
+
+/*!
+    Returns a Boolean value that indicates whether the receiver
+    has any documents with unsaved changes.
+*/
+- (BOOL)hasEditedDocuments
+{
+    var iter = [_documents objectEnumerator],
+        obj;
+
+    while ((obj = [iter nextObject]) !== nil)
+    {
+        if ([obj isDocumentEdited])
+            return YES;
+    }
+
+    return NO;
 }
 
 - (CPString)defaultType
@@ -339,10 +378,10 @@ var CPSharedDocumentController = nil;
 - (void)closeAllDocumentsWithDelegate:(id)aDelegate didCloseAllSelector:(SEL)didCloseSelector contextInfo:(Object)info
 {
     var context = {
-        delegate: aDelegate,
-        selector: didCloseSelector,
-        context: info
-    };
+            delegate: aDelegate,
+            selector: didCloseSelector,
+            context: info
+        };
 
     [self _closeDocumentsStartingWith:nil shouldClose:YES context:context];
 }

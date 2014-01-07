@@ -21,33 +21,34 @@
  */
 
 @import <AppKit/CPSearchField.j>
+
 @import "NSTextField.j"
+
+@class Nib2Cib
 
 
 @implementation CPSearchField (NSCoding)
 
 - (id)NS_initWithCoder:(CPCoder)aCoder
 {
-    self = [super NS_initWithCoder:aCoder];
+    return [super NS_initWithCoder:aCoder];
+}
 
-    if (self)
+- (void)NS_initWithCell:(NSCell)cell
+{
+    [super NS_initWithCell:cell];
+
+    [self setRecentsAutosaveName:[cell recentsAutosaveName]];
+    [self setMaximumRecents:[cell maximumRecents]];
+    [self setSendsWholeSearchString:[cell sendsWholeSearchString]];
+    [self setSendsSearchStringImmediately:[cell sendsSearchStringImmediately]];
+
+    if ([[Nib2Cib defaultTheme] name] === @"Aristo" && [self isBezeled])
     {
-        var cell = [aCoder decodeObjectForKey:@"NSCell"];
-
-        [self setRecentsAutosaveName:[cell recentsAutosaveName]];
-        [self setMaximumRecents:[cell maximumRecents]];
-        [self setSendsWholeSearchString:[cell sendsWholeSearchString]];
-        [self setSendsSearchStringImmediately:[cell sendsSearchStringImmediately]];
-
-        if ([self isBezeled])
-        {
-            // NSTextField.j makes the field +7.0 pixels tall. We want +8.0 to go to 30.
-            var frame = [self frame];
-            [self setFrameSize:CGSizeMake(frame.size.width, frame.size.height + 1.0)];
-        }
+        // NSTextField.j makes the field +7.0 pixels tall. We want +8.0 to go to 30.
+        var frame = [self frame];
+        [self setFrameSize:CGSizeMake(frame.size.width, frame.size.height)];
     }
-
-    return self;
 }
 
 @end
@@ -59,6 +60,12 @@
 - (id)initWithCoder:(CPCoder)aCoder
 {
     self = [self NS_initWithCoder:aCoder];
+
+    if (self)
+    {
+        var cell = [aCoder decodeObjectForKey:@"NSCell"];
+        [self NS_initWithCell:cell];
+    }
 
     return self;
 }
@@ -84,10 +91,10 @@
     {
         _recentsAutosaveName = [aCoder decodeObjectForKey:@"NSRecentsAutosaveName"];
         _maximumRecents = [aCoder decodeIntForKey:@"NSMaximumRecents"];
-        _sendsWholeSearchString = [aCoder decodeBoolForKey:@"NSSendsWholeSearchString"] ? YES : NO;
+        _sendsWholeSearchString = [aCoder decodeBoolForKey:@"NSSendsWholeSearchString"];
 
         // These bytes don't seem to be used for anything else but the send immediately flag
-        _sendsSearchStringImmediately = [aCoder decodeBytesForKey:@"NSSearchFieldFlags"] ? YES: NO;
+        _sendsSearchStringImmediately = [aCoder decodeBytesForKey:@"NSSearchFieldFlags"] ? YES : NO;
     }
 
     return self;

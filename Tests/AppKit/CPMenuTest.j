@@ -15,6 +15,8 @@
     BOOL    saveDocumentWasCalled;
     BOOL    saveDocumentAsWasCalled;
     BOOL    undoWasCalled;
+
+    CPMenuItem anInstantiatedMenuItem;
 }
 
 - (void)setUp
@@ -67,6 +69,10 @@
 
     [menu addItem:editMenuItem];
     [menu addItem:[CPMenuItem separatorItem]];
+
+    // Test Issue 1899
+    anInstantiatedMenuItem = [[CPMenuItem alloc] initWithTitle:@"Highlight" action:nil keyEquivalent:@""];
+    [menu addItem:anInstantiatedMenuItem];
 }
 
 - (void)_retarget:(CPMenuItem)aMenu
@@ -74,12 +80,65 @@
     if (!aMenu)
         return;
 
-    for(var i=0; i<[aMenu numberOfItems]; i++)
+    for (var i = 0; i < [aMenu numberOfItems]; i++)
     {
         var item = [aMenu itemAtIndex:i];
         [item setTarget:self];
         [self _retarget:[item submenu]];
     }
+}
+
+- (void)testRemoveAllItemsHighlighting
+{
+    // hack it so that this menu item is highlighted
+    [menu _highlightItemAtIndex:[menu indexOfItem:anInstantiatedMenuItem]];
+
+    // test both the public isHighlighted method, as well as the underlying view highlighting
+    [self assertTrue:[anInstantiatedMenuItem isHighlighted]];
+    [self assertTrue:[[[anInstantiatedMenuItem _menuItemView] view] isHighlighted] message:@"Underlying view was not highlighted in removeAll"];
+
+    [menu removeAllItems];
+
+    [self assertFalse:[anInstantiatedMenuItem isHighlighted]];
+    [self assertFalse:[[[anInstantiatedMenuItem _menuItemView] view] isHighlighted] message:@"Underlying view was still highlighted after removeAll"];
+}
+
+- (void)testRemoveOneItemHighlighting
+{
+    [menu _highlightItemAtIndex:[menu indexOfItem:anInstantiatedMenuItem]];
+
+    [self assertTrue:[anInstantiatedMenuItem isHighlighted]];
+    [self assertTrue:[[[anInstantiatedMenuItem _menuItemView] view] isHighlighted] message:@"Underlying view was not highlighted in removeItem"];
+
+    [menu removeItem:anInstantiatedMenuItem];
+
+    [self assertFalse:[anInstantiatedMenuItem isHighlighted]];
+    [self assertFalse:[[[anInstantiatedMenuItem _menuItemView] view] isHighlighted] message:@"Underlying view was still highlighted after removeItem"];
+}
+
+- (void)testRemoveOneItemByIndexHighlighting
+{
+    [menu _highlightItemAtIndex:[menu indexOfItem:anInstantiatedMenuItem]];
+
+    [self assertTrue:[anInstantiatedMenuItem isHighlighted]];
+    [self assertTrue:[[[anInstantiatedMenuItem _menuItemView] view] isHighlighted] message:@"Underlying view was not highlighted in removeItemAtIndex"];
+
+    [menu removeItemAtIndex:[menu indexOfItem:anInstantiatedMenuItem]];
+
+    [self assertFalse:[anInstantiatedMenuItem isHighlighted]];
+    [self assertFalse:[[[anInstantiatedMenuItem _menuItemView] view] isHighlighted] message:@"Underlying view was still highlighted after removeItemAtIndex"];
+}
+
+- (void)testSetEnabledHighlighting
+{
+    [menu _highlightItemAtIndex:[menu indexOfItem:anInstantiatedMenuItem]];
+
+    [self assertTrue:[anInstantiatedMenuItem isHighlighted]];
+
+    [anInstantiatedMenuItem setEnabled:NO];
+
+    [self assertFalse:[anInstantiatedMenuItem isHighlighted]];
+    [self assertFalse:[[[anInstantiatedMenuItem _menuItemView] view] isHighlighted] message:@"Underlying view was still highlighted after setEnabled:NO"];
 }
 
 - (void)testKeyEquivalent
@@ -88,24 +147,24 @@
 
     // Don't match anything.
     [menu performKeyEquivalent:[CPEvent keyEventWithType:CPKeyDown location:CGPointMakeZero() modifierFlags:CPPlatformActionKeyMask
-        timestamp:nil windowNumber:nil context:nil
+        timestamp:0 windowNumber:0 context:nil
         characters:"b" charactersIgnoringModifiers:"b" isARepeat:NO keyCode:0]];
     [self assertFalse:escapeWasCalled || escapeNoModifierWasCalled || openDocumentWasCalled || undoWasCalled];
 
     [menu performKeyEquivalent:[CPEvent keyEventWithType:CPKeyDown location:CGPointMakeZero() modifierFlags:0
-        timestamp:nil windowNumber:nil context:nil
+        timestamp:0 windowNumber:0 context:nil
         characters:"o" charactersIgnoringModifiers:"o" isARepeat:NO keyCode:0]];
     [self assertFalse:escapeWasCalled || escapeNoModifierWasCalled || openDocumentWasCalled || undoWasCalled];
 
     [menu performKeyEquivalent:[CPEvent keyEventWithType:CPKeyDown location:CGPointMakeZero() modifierFlags:CPPlatformActionKeyMask
-        timestamp:nil windowNumber:nil context:nil
+        timestamp:0 windowNumber:0 context:nil
         characters:"o" charactersIgnoringModifiers:"o" isARepeat:NO keyCode:0]];
     [self assertFalse:escapeWasCalled || escapeNoModifierWasCalled || undoWasCalled];
     [self assertTrue:openDocumentWasCalled message:"expect openDocumentWasCalled"];
 
     openDocumentWasCalled = NO;
     [menu performKeyEquivalent:[CPEvent keyEventWithType:CPKeyDown location:CGPointMakeZero() modifierFlags:CPPlatformActionKeyMask
-        timestamp:nil windowNumber:nil context:nil
+        timestamp:0 windowNumber:0 context:nil
         characters:CPUndoKeyEquivalent charactersIgnoringModifiers:CPUndoKeyEquivalent isARepeat:NO keyCode:0]];
     [self assertFalse:escapeWasCalled || escapeNoModifierWasCalled || openDocumentWasCalled];
     [self assertTrue:undoWasCalled];
@@ -116,7 +175,7 @@
     [self _retarget:menu];
 
     [menu performKeyEquivalent:[CPEvent keyEventWithType:CPKeyDown location:CGPointMakeZero() modifierFlags:0
-        timestamp:nil windowNumber:nil context:nil
+        timestamp:0 windowNumber:0 context:nil
         characters:CPEscapeFunctionKey charactersIgnoringModifiers:CPEscapeFunctionKey isARepeat:NO keyCode:0]];
     [self assertFalse:escapeWasCalled || openDocumentWasCalled || undoWasCalled];
     [self assertTrue:escapeNoModifierWasCalled];
@@ -124,7 +183,7 @@
     escapeNoModifierWasCalled = NO;
 
     [menu performKeyEquivalent:[CPEvent keyEventWithType:CPKeyDown location:CGPointMakeZero() modifierFlags:CPPlatformActionKeyMask
-        timestamp:nil windowNumber:nil context:nil
+        timestamp:0 windowNumber:0 context:nil
         characters:CPEscapeFunctionKey charactersIgnoringModifiers:CPEscapeFunctionKey isARepeat:NO keyCode:0]];
     [self assertFalse:escapeNoModifierWasCalled || openDocumentWasCalled || undoWasCalled];
     [self assertTrue:escapeWasCalled];
@@ -135,15 +194,15 @@
     [self _retarget:menu];
 
     [menu performKeyEquivalent:[CPEvent keyEventWithType:CPKeyDown location:CGPointMakeZero() modifierFlags:CPPlatformActionKeyMask
-        timestamp:nil windowNumber:nil context:nil
+        timestamp:0 windowNumber:0 context:nil
         characters:@"s" charactersIgnoringModifiers:@"s" isARepeat:NO keyCode:0]];
     [self assertFalse:escapeWasCalled || escapeNoModifierWasCalled || openDocumentWasCalled || saveDocumentAsWasCalled || undoWasCalled];
     [self assertTrue:saveDocumentWasCalled message:"saveDocumentWasCalled"];
 
     saveDocumentWasCalled = NO;
 
-    [menu performKeyEquivalent:[CPEvent keyEventWithType:CPKeyDown location:CGPointMakeZero() modifierFlags:CPPlatformActionKeyMask|CPShiftKeyMask
-        timestamp:nil windowNumber:nil context:nil
+    [menu performKeyEquivalent:[CPEvent keyEventWithType:CPKeyDown location:CGPointMakeZero() modifierFlags:CPPlatformActionKeyMask | CPShiftKeyMask
+        timestamp:0 windowNumber:0 context:nil
         characters:@"s" charactersIgnoringModifiers:@"s" isARepeat:NO keyCode:0]];
     [self assertFalse:escapeWasCalled || escapeNoModifierWasCalled || openDocumentWasCalled || saveDocumentWasCalled || undoWasCalled];
     [self assertTrue:saveDocumentAsWasCalled message:"saveDocumentAsWasCalled"];

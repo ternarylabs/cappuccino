@@ -22,6 +22,7 @@
 
 @import <Foundation/CPObject.j>
 @import <Foundation/CPArray.j>
+@import <Foundation/CPData.j>
 @import <Foundation/CPDictionary.j>
 @import <Foundation/CPPropertyListSerialization.j>
 
@@ -73,12 +74,12 @@ var CPPasteboards = nil,
 */
 + (void)initialize
 {
-    if (self != [CPPasteboard class])
+    if (self !== [CPPasteboard class])
         return;
 
     [self setVersion:1.0];
 
-    CPPasteboards = [CPDictionary dictionary];
+    CPPasteboards = @{};
 
     if (typeof window.cpPasteboardWithName !== "undefined")
         supportsNativePasteboard = YES;
@@ -117,11 +118,11 @@ var CPPasteboards = nil,
 
     if (self)
     {
-        _name = aName;
+//        _name = aName;
         _types = [];
 
-        _owners = [CPDictionary dictionary];
-        _provided = [CPDictionary dictionary];
+        _owners = @{};
+        _provided = @{};
 
         _changeCount = 0;
 
@@ -187,13 +188,15 @@ var CPPasteboards = nil,
 {
     [_types setArray:types];
 
-    _owners = [CPDictionary dictionary];
-    _provided = [CPDictionary dictionary];
+    _owners = @{};
+    _provided = @{};
 
-    var count = _types.length;
-
-    while (count--)
-        [_owners setObject:anOwner forKey:_types[count]];
+    if (anOwner)
+    {
+        var count = _types.length;
+        while (count--)
+            [_owners setObject:anOwner forKey:_types[count]];
+    }
 
     if (_nativePasteboard && shouldUpdate)
     {
@@ -204,6 +207,7 @@ var CPPasteboards = nil,
         _nativePasteboard.declareTypes_(nativeTypes);
         _changeCount = _nativePasteboard.changeCount();
     }
+
     return ++_changeCount;
 }
 
@@ -242,19 +246,23 @@ var CPPasteboards = nil,
 */
 - (void)setString:(CPString)aString forType:(CPString)aType
 {
+    // Putting a non-string on the string pasteboard can lead to strange crashes.
+    if (aString && aString.isa && ![aString isKindOfClass:CPString])
+        [CPException raise:CPInvalidArgumentException reason:"CPPasteboard setString:forType: must be called with a string."];
+
     [self setPropertyList:aString forType:aType];
 }
 
 // Determining Types
 /*!
-    Checks the pasteboard's types for a match with the types listen in the specified array. The array should
+    Checks the pasteboard's types for a match with the types listed in the specified array. The array should
     be ordered by the requestor's most preferred data type first.
     @param anArray an array of requested types ordered by preference
     @return the highest match with the pasteboard's supported types or \c nil if no match was found
 */
 - (CPString)availableTypeFromArray:(CPArray)anArray
 {
-    return [[self types] firstObjectCommonWithArray:anArray];
+    return [anArray firstObjectCommonWithArray:[self types]];
 }
 
 /*!

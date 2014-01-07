@@ -14,11 +14,12 @@
     var control = [[CPCheckBox alloc] initWithFrame:CGRectMakeZero()];
     [control setAllowsMixedState:YES];
 
-    content = [
-        CPOffState,
-        CPOnState
-    ];
-    arrayController = [[CPArrayController alloc] initWithContent:content];
+    var content =
+        [
+            CPOffState,
+            CPOnState
+        ],
+        arrayController = [[CPArrayController alloc] initWithContent:content];
 
     // First test defaults.
     [control bind:CPValueBinding toObject:arrayController withKeyPath:@"selection.self" options:nil];
@@ -44,17 +45,12 @@
     [control unbind:CPValueBinding];
 
     // Set up a new binding with explicit placeholders, different from the default ones.
-    var options = [CPDictionary dictionaryWithObjects:[
-            CPOffState,
-            CPOnState,
-            CPOnState,
-            CPMixedState
-        ] forKeys:[
-            CPMultipleValuesPlaceholderBindingOption,
-            CPNoSelectionPlaceholderBindingOption,
-            CPNotApplicablePlaceholderBindingOption,
-            CPNullPlaceholderBindingOption
-        ]];
+    var options = @{
+            CPMultipleValuesPlaceholderBindingOption: CPOffState,
+            CPNoSelectionPlaceholderBindingOption: CPOnState,
+            CPNotApplicablePlaceholderBindingOption: CPOnState,
+            CPNullPlaceholderBindingOption: CPMixedState,
+        };
 
     [control bind:CPValueBinding toObject:arrayController withKeyPath:@"selection.self" options:options];
 
@@ -78,14 +74,15 @@
 {
     var control = [[CPCheckBox alloc] initWithFrame:CGRectMakeZero()];
 
-    content = [
-        [CPDictionary dictionaryWithObject:YES forKey:@"state"],
-        [CPDictionary dictionaryWithObject:NO forKey:@"state"]
-    ];
-    arrayController = [[CPArrayController alloc] initWithContent:content];
+    var content =
+        [
+            @{ @"state": YES },
+            @{ @"state": NO }
+        ],
+        arrayController = [[CPArrayController alloc] initWithContent:content];
 
     // First test defaults.
-    [control bind:CPValueBinding toObject:arrayController withKeyPath:@"selection.state" options:[CPDictionary dictionaryWithObject:@"CPNegateBoolean" forKey:CPValueTransformerNameBindingOption]];
+    [control bind:CPValueBinding toObject:arrayController withKeyPath:@"selection.state" options:@{ CPValueTransformerNameBindingOption: @"CPNegateBoolean" }];
 
     [arrayController setSelectionIndexes:[CPIndexSet indexSetWithIndex:0]];
     [self assert:CPOffState equals:[control objectValue] message:"content[0] is negated"]

@@ -24,15 +24,16 @@
 
 @import "CPControl.j"
 @import "CPImage.j"
+@import "CPScrollView.j"
 @import "CPTableView.j"
 @import "CPTextField.j"
-@import "CPScrollView.j"
+
+@global CPApp
 
 /*!
     @ingroup appkit
     @class CPBrowser
 */
-
 @implementation CPBrowser : CPControl
 {
     id              _delegate;
@@ -65,18 +66,18 @@
     CPArray         _columnWidths;
 }
 
-+ (CPImage)branchImage
++ (CPString)defaultThemeClass
 {
-    return [[CPImage alloc] initWithContentsOfFile:[[CPBundle bundleForClass:[CPBrowser class]]
-                                                    pathForResource:"browser-leaf.png"]
-                                              size:CGSizeMake(9,9)];
+    return "browser";
 }
 
-+ (CPImage)highlightedBranchImage
++ (CPDictionary)themeAttributes
 {
-    return [[CPImage alloc] initWithContentsOfFile:[[CPBundle bundleForClass:[CPBrowser class]]
-                                                    pathForResource:"browser-leaf-highlighted.png"]
-                                              size:CGSizeMake(9,9)];
+    return @{
+        @"image-control-resize": [CPNull null],
+        @"image-control-leaf": [CPNull null],
+        @"image-control-leaf-pressed": [CPNull null]
+    };
 }
 
 - (id)initWithFrame:(CGRect)aFrame
@@ -170,13 +171,18 @@
     [self addColumn];
 }
 
-- (void)setLastColumn:(int)columnIndex
+- (void)setLastColumn:(CPInteger)columnIndex
 {
     if (columnIndex >= _tableViews.length)
         return;
 
     var oldValue = _tableViews.length - 1,
         indexPlusOne = columnIndex + 1; // unloads all later columns.
+
+    if (columnIndex > 0)
+        [_tableViews[columnIndex - 1] setNeedsDisplay:YES];
+
+    [_tableViews[columnIndex] setNeedsDisplay:YES];
 
     [[_tableViews.slice(indexPlusOne) valueForKey:"enclosingScrollView"]
       makeObjectsPerformSelector:@selector(removeFromSuperview)];
@@ -258,7 +264,7 @@
         var column = [[CPTableColumn alloc] initWithIdentifier:@"Image"],
             view = [[CPImageView alloc] initWithFrame:CGRectMakeZero()];
 
-        [view setImageScaling:CPScaleProportionally];
+        [view setImageScaling:CPImageScaleProportionallyDown];
 
         [column setDataView:view];
         [column setResizingMask:CPTableColumnNoResizing];
@@ -276,8 +282,8 @@
     var column = [[CPTableColumn alloc] initWithIdentifier:@"Leaf"],
         view = [[_CPBrowserLeafView alloc] initWithFrame:CGRectMakeZero()];
 
-    [view setBranchImage:[[self class] branchImage]];
-    [view setHighlightedBranchImage:[[self class] highlightedBranchImage]];
+    [view setBranchImage:[self valueForThemeAttribute:@"image-control-leaf"]];
+    [view setHighlightedBranchImage:[self valueForThemeAttribute:@"image-control-leaf-pressed"]];
 
     [column setDataView:view];
     [column setResizingMask:CPTableColumnNoResizing];
@@ -285,7 +291,7 @@
     [aTableView addTableColumn:column];
 }
 
-- (void)reloadColumn:(int)column
+- (void)reloadColumn:(CPInteger)column
 {
     [[self tableViewInColumn:column] reloadData];
 }
@@ -353,7 +359,7 @@
 
 // ITEMS
 
-- (id)itemAtRow:(int)row inColumn:(int)column
+- (id)itemAtRow:(CPInteger)row inColumn:(CPInteger)column
 {
     return [_tableDelegates[column] childAtIndex:row];
 }
@@ -363,7 +369,7 @@
     return [_delegate respondsToSelector:@selector(browser:isLeafItem:)] && [_delegate browser:self isLeafItem:item];
 }
 
-- (id)parentForItemsInColumn:(int)column
+- (id)parentForItemsInColumn:(CPInteger)column
 {
     return [_tableDelegates[column] _item];
 }
@@ -425,11 +431,26 @@
 
 - (void)keyDown:(CPEvent)anEvent
 {
-    var column = [self selectedColumn];
-    if (column === -1)
+    var key = [anEvent charactersIgnoringModifiers],
+        column = [self selectedColumn];
+
+    if (column === CPNotFound)
         return;
 
-    [_tableViews[column] keyDown:anEvent];
+    if (key === CPLeftArrowFunctionKey || key === CPRightArrowFunctionKey)
+    {
+        if (key === CPLeftArrowFunctionKey)
+        {
+            var previousColumn = column - 1,
+                selectedRow = [self selectedRowInColumn:previousColumn];
+
+            [self selectRow:selectedRow inColumn:previousColumn];
+        }
+        else
+            [self selectRow:0 inColumn:column + 1];
+    }
+    else
+        [_tableViews[column] keyDown:anEvent];
 }
 
 // SIZING
@@ -631,7 +652,7 @@
     [_tableViews makeObjectsPerformSelector:@selector(registerForDraggedTypes:) withObject:types];
 }
 
-- (BOOL)canDragRowsWithIndexes:(CPIndexSet)rowIndexes inColumn:(int)columnIndex withEvent:(CPEvent)dragEvent
+- (BOOL)canDragRowsWithIndexes:(CPIndexSet)rowIndexes inColumn:(CPInteger)columnIndex withEvent:(CPEvent)dragEvent
 {
     if ([_delegate respondsToSelector:@selector(browser:canDragRowsWithIndexes:inColumn:withEvent:)])
         return [_delegate browser:self canDragRowsWithIndexes:rowIndexes inColumn:columnIndex withEvent:dragEvent];
@@ -639,7 +660,7 @@
     return YES;
 }
 
-- (CPImage)draggingImageForRowsWithIndexes:(CPIndexSet)rowIndexes inColumn:(int)columnIndex withEvent:(CPEvent)dragEvent offset:(CGPoint)dragImageOffset
+- (CPImage)draggingImageForRowsWithIndexes:(CPIndexSet)rowIndexes inColumn:(CPInteger)columnIndex withEvent:(CPEvent)dragEvent offset:(CGPoint)dragImageOffset
 {
     if ([_delegate respondsToSelector:@selector(browser:draggingImageForRowsWithIndexes:inColumn:withEvent:offset:)])
         return [_delegate browser:self draggingImageForRowsWithIndexes:rowIndexes inColumn:columnIndex withEvent:dragEvent offset:dragImageOffset];
@@ -647,7 +668,7 @@
     return nil;
 }
 
-- (CPView)draggingViewForRowsWithIndexes:(CPIndexSet)rowIndexes inColumn:(int)columnIndex withEvent:(CPEvent)dragEvent offset:(CGPoint)dragImageOffset
+- (CPView)draggingViewForRowsWithIndexes:(CPIndexSet)rowIndexes inColumn:(CPInteger)columnIndex withEvent:(CPEvent)dragEvent offset:(CGPoint)dragImageOffset
 {
     if ([_delegate respondsToSelector:@selector(browser:draggingViewForRowsWithIndexes:inColumn:withEvent:offset:)])
         return [_delegate browser:self draggingViewForRowsWithIndexes:rowIndexes inColumn:columnIndex withEvent:dragEvent offset:dragImageOffset];
@@ -704,8 +725,6 @@
 @end
 
 
-var _CPBrowserResizeControlBackgroundImage = nil;
-
 @implementation _CPBrowserResizeControl : CPView
 {
     CGPoint     _mouseDownX;
@@ -714,22 +733,14 @@ var _CPBrowserResizeControlBackgroundImage = nil;
     unsigned    _width;
 }
 
-+ (CPImage)backgroundImage
-{
-    if (!_CPBrowserResizeControlBackgroundImage)
-    {
-        var path = [[CPBundle bundleForClass:[self class]] pathForResource:"browser-resize-control.png"];
-        _CPBrowserResizeControlBackgroundImage = [[CPImage alloc] initWithContentsOfFile:path
-                                                                                    size:CGSizeMake(15, 14)];
-    }
-
-    return _CPBrowserResizeControlBackgroundImage;
-}
-
 - (id)initWithFrame:(CGRect)aFrame
 {
     if (self = [super initWithFrame:aFrame])
-        [self setBackgroundColor:[CPColor colorWithPatternImage:[[self class] backgroundImage]]];
+    {
+        var browser = [[CPBrowser alloc] init];
+        [self setBackgroundColor:[CPColor colorWithPatternImage:[browser valueForThemeAttribute:@"image-control-resize"]]];
+    }
+
 
     return self;
 }
@@ -760,7 +771,7 @@ var _CPBrowserResizeControlBackgroundImage = nil;
     CPBrowser                _browser @accessors;
 }
 
-- (void)initWithFrame:(CGRect)aFrame
+- (id)initWithFrame:(CGRect)aFrame
 {
     if (self = [super initWithFrame:aFrame])
     {
@@ -814,18 +825,26 @@ var _CPBrowserResizeControlBackgroundImage = nil;
     return _browser;
 }
 
+/*!
+    @ignore
+*/
+- (BOOL)_isFocused
+{
+    return ([super _isFocused] || [_browser tableViewInColumn:[_browser selectedColumn]] === self);
+}
+
 - (BOOL)canDragRowsWithIndexes:(CPIndexSet)rowIndexes atPoint:(CGPoint)mouseDownPoint
 {
     return [_browser canDragRowsWithIndexes:rowIndexes inColumn:[_browser columnOfTableView:self] withEvent:[CPApp currentEvent]];
 }
 
-- (CPImage)dragImageForRowsWithIndexes:(CPIndexSet)dragRows tableColumns:(CPArray)theTableColumns event:(CPEvent)dragEvent offset:(CPPointPointer)dragImageOffset
+- (CPImage)dragImageForRowsWithIndexes:(CPIndexSet)dragRows tableColumns:(CPArray)theTableColumns event:(CPEvent)dragEvent offset:(CGPoint)dragImageOffset
 {
     return [_browser draggingImageForRowsWithIndexes:dragRows inColumn:[_browser columnOfTableView:self] withEvent:dragEvent offset:dragImageOffset] ||
            [super dragImageForRowsWithIndexes:dragRows tableColumns:theTableColumns event:dragEvent offset:dragImageOffset];
 }
 
-- (CPView)dragViewForRowsWithIndexes:(CPIndexSet)dragRows tableColumns:(CPArray)theTableColumns event:(CPEvent)dragEvent offset:(CPPoint)dragViewOffset
+- (CPView)dragViewForRowsWithIndexes:(CPIndexSet)dragRows tableColumns:(CPArray)theTableColumns event:(CPEvent)dragEvent offset:(CGPoint)dragViewOffset
 {
     var count = theTableColumns.length;
     while (count--)
@@ -838,30 +857,6 @@ var _CPBrowserResizeControlBackgroundImage = nil;
            [super dragViewForRowsWithIndexes:dragRows tableColumns:theTableColumns event:dragEvent offset:dragViewOffset];
 }
 
-- (void)moveUp:(id)sender
-{
-    [super moveUp:sender];
-    [_browser selectRow:[self selectedRow] inColumn:[_browser selectedColumn]];
-}
-
-- (void)moveDown:(id)sender
-{
-    [super moveDown:sender];
-    [_browser selectRow:[self selectedRow] inColumn:[_browser selectedColumn]];
-}
-
-- (void)moveLeft:(id)sender
-{
-    var previousColumn = [_browser selectedColumn] - 1,
-        selectedRow = [_browser selectedRowInColumn:previousColumn];
-
-    [_browser selectRow:selectedRow inColumn:previousColumn];
-}
-
-- (void)moveRight:(id)sender
-{
-    [_browser selectRow:0 inColumn:[_browser selectedColumn] + 1];
-}
 
 @end
 
@@ -907,12 +902,12 @@ var _CPBrowserResizeControlBackgroundImage = nil;
     [_browser selectRowIndexes:selectedIndexes inColumn:_index];
 }
 
-- (id)childAtIndex:(unsigned)index
+- (id)childAtIndex:(CPUInteger)index
 {
     return [_delegate browser:_browser child:index ofItem:_item];
 }
 
-- (BOOL)tableView:(CPTableView)aTableView acceptDrop:(id)info row:(int)row dropOperation:(CPTableViewDropOperation)operation
+- (BOOL)tableView:(CPTableView)aTableView acceptDrop:(id)info row:(CPInteger)row dropOperation:(CPTableViewDropOperation)operation
 {
     if ([_delegate respondsToSelector:@selector(browser:acceptDrop:atRow:column:dropOperation:)])
         return [_delegate browser:_browser acceptDrop:info atRow:row column:_index dropOperation:operation];
@@ -920,7 +915,7 @@ var _CPBrowserResizeControlBackgroundImage = nil;
         return NO;
 }
 
-- (CPDragOperation)tableView:(CPTableView)aTableView validateDrop:(id)info proposedRow:(int)row proposedDropOperation:(CPTableViewDropOperation)operation
+- (CPDragOperation)tableView:(CPTableView)aTableView validateDrop:(id)info proposedRow:(CPInteger)row proposedDropOperation:(CPTableViewDropOperation)operation
 {
     if ([_delegate respondsToSelector:@selector(browser:validateDrop:proposedRow:column:dropOperation:)])
         return [_delegate browser:_browser validateDrop:info proposedRow:row column:_index dropOperation:operation];
@@ -988,7 +983,7 @@ var _CPBrowserResizeControlBackgroundImage = nil;
         isHighlighted = [self themeState] & CPThemeStateSelectedDataView;
 
     [imageView setImage: _isLeaf ? (isHighlighted ? _highlightedBranchImage : _branchImage) : nil];
-    [imageView setImageScaling:CPScaleNone];
+    [imageView setImageScaling:CPImageScaleNone];
 }
 
 - (void)encodeWithCoder:(CPCoder)aCoder
@@ -1000,7 +995,7 @@ var _CPBrowserResizeControlBackgroundImage = nil;
     [aCoder encodeObject:_highlightedBranchImage forKey:"_CPBrowserLeafViewHighlightedBranchImageKey"];
 }
 
-- (void)initWithCoder:(CPCoder)aCoder
+- (id)initWithCoder:(CPCoder)aCoder
 {
     if (self = [super initWithCoder:aCoder])
     {

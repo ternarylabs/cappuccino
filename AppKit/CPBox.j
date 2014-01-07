@@ -20,6 +20,7 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
+@import "CPTextField.j"
 @import "CPView.j"
 
 // CPBoxType
@@ -55,19 +56,38 @@ CPBelowBottom = 6;
 {
     CPBoxType       _boxType;
     CPBorderType    _borderType;
-
-    CPColor         _borderColor;
-    CPColor         _fillColor;
-
-    float           _cornerRadius;
-    float           _borderWidth;
-
-    CPSize          _contentMargin;
     CPView          _contentView;
 
     CPString        _title @accessors(getter=title);
     int             _titlePosition @accessors(getter=titlePosition);
     CPTextField     _titleView;
+}
+
++ (Class)_binderClassForBinding:(CPString)aBinding
+{
+    if ([aBinding hasPrefix:CPDisplayPatternTitleBinding])
+        return [CPTitleWithPatternBinding class];
+
+    return [super _binderClassForBinding:aBinding];
+}
+
++ (CPString)defaultThemeClass
+{
+    return @"box";
+}
+
++ (CPDictionary)themeAttributes
+{
+    return @{
+            @"background-color": [CPNull null],
+            @"border-color": [CPNull null],
+            @"border-width": 1.0,
+            @"corner-radius": 3.0,
+            @"inner-shadow-offset": CGSizeMakeZero(),
+            @"inner-shadow-size": 6.0,
+            @"inner-shadow-color": [CPNull null],
+            @"content-margin": CGSizeMakeZero(),
+        };
 }
 
 + (id)boxEnclosingView:(CPView)aView
@@ -85,18 +105,13 @@ CPBelowBottom = 6;
     return box;
 }
 
-- (id)initWithFrame:(CPRect)frameRect
+- (id)initWithFrame:(CGRect)frameRect
 {
     self = [super initWithFrame:frameRect];
 
     if (self)
     {
         _borderType = CPBezelBorder;
-        _fillColor = [CPColor clearColor];
-        _borderColor = [CPColor blackColor];
-
-        _borderWidth = 1.0;
-        _contentMargin = CGSizeMake(0.0, 0.0);
 
         _titlePosition = CPNoTitle;
         _titleView = [CPTextField labelWithTitle:@""];
@@ -118,7 +133,7 @@ CPBelowBottom = 6;
 
     @return the border rectangle of the box
 */
-- (CPRect)borderRect
+- (CGRect)borderRect
 {
     return [self bounds];
 }
@@ -208,58 +223,54 @@ CPBelowBottom = 6;
 
 - (CPColor)borderColor
 {
-    return _borderColor;
+    return [self valueForThemeAttribute:@"border-color"];
 }
 
 - (void)setBorderColor:(CPColor)color
 {
-    if ([color isEqual:_borderColor])
+    if ([color isEqual:[self borderColor]])
         return;
 
-    _borderColor = color;
-    [self setNeedsDisplay:YES];
+    [self setValue:color forThemeAttribute:@"border-color"];
 }
 
 - (float)borderWidth
 {
-    return _borderWidth;
+    return [self valueForThemeAttribute:@"border-width"];
 }
 
 - (void)setBorderWidth:(float)width
 {
-    if (width === _borderWidth)
+    if (width === [self borderWidth])
         return;
 
-    _borderWidth = width;
-    [self setNeedsDisplay:YES];
+    [self setValue:width forThemeAttribute:@"border-width"];
 }
 
 - (float)cornerRadius
 {
-    return _cornerRadius;
+    return [self valueForThemeAttribute:@"corner-radius"];
 }
 
 - (void)setCornerRadius:(float)radius
 {
-    if (radius === _cornerRadius)
+    if (radius === [self cornerRadius])
         return;
 
-    _cornerRadius = radius;
-    [self setNeedsDisplay:YES];
+    [self setValue:radius forThemeAttribute:@"corner-radius"];
 }
 
 - (CPColor)fillColor
 {
-    return _fillColor;
+    return [self valueForThemeAttribute:@"background-color"];
 }
 
 - (void)setFillColor:(CPColor)color
 {
-    if ([color isEqual:_fillColor])
+    if ([color isEqual:[self fillColor]])
         return;
 
-    _fillColor = color;
-    [self setNeedsDisplay:YES];
+    [self setValue:color forThemeAttribute:@"background-color"];
 }
 
 - (CPView)contentView
@@ -272,34 +283,43 @@ CPBelowBottom = 6;
     if (aView === _contentView)
         return;
 
-    [aView setFrame:CGRectInset([self bounds], _contentMargin.width + _borderWidth, _contentMargin.height + _borderWidth)];
+    var borderWidth = [self borderWidth],
+        contentMargin = [self valueForThemeAttribute:@"content-margin"];
+
+    [aView setFrame:CGRectInset([self bounds], contentMargin.width + borderWidth, contentMargin.height + borderWidth)];
     [aView setAutoresizingMask:CPViewWidthSizable | CPViewHeightSizable];
-    [self replaceSubview:_contentView with:aView];
+
+    //  A nil contentView is allowed (tested in Cocoa 2013-02-22).
+    if (!aView)
+        [_contentView removeFromSuperview];
+    else if (_contentView)
+        [self replaceSubview:_contentView with:aView];
+    else
+        [self addSubview:aView];
 
     _contentView = aView;
 }
 
-- (CPSize)contentViewMargins
+- (CGSize)contentViewMargins
 {
-    return _contentMargin;
+    return [self valueForThemeAttribute:@"content-margin"];
 }
 
-- (void)setContentViewMargins:(CPSize)size
+- (void)setContentViewMargins:(CGSize)size
 {
      if (size.width < 0 || size.height < 0)
          [CPException raise:CPGenericException reason:@"Margins must be positive"];
 
-    _contentMargin = CGSizeMakeCopy(size);
-    [self setNeedsDisplay:YES];
+    [self setValue:CGSizeMakeCopy(size) forThemeAttribute:@"content-margin"];
 }
 
-- (void)setFrameFromContentFrame:(CPRect)aRect
+- (void)setFrameFromContentFrame:(CGRect)aRect
 {
-    var offset = [self _titleHeightOffset];
+    var offset = [self _titleHeightOffset],
+        borderWidth = [self borderWidth],
+        contentMargin = [self valueForThemeAttribute:@"content-margin"];
 
-    [self setFrame:CGRectInset(aRect, -(_contentMargin.width + _borderWidth), -(_contentMargin.height + offset[0] + _borderWidth))];
-
-    [self setNeedsDisplay:YES];
+    [self setFrame:CGRectInset(aRect, -(contentMargin.width + borderWidth), -(contentMargin.height + offset[0] + borderWidth))];
 }
 
 - (void)setTitle:(CPString)aTitle
@@ -322,6 +342,26 @@ CPBelowBottom = 6;
     [self _manageTitlePositioning];
 }
 
+- (CPFont)titleFont
+{
+    return [_titleView font];
+}
+
+- (void)setTitleFont:(CPFont)aFont
+{
+    [_titleView setFont:aFont];
+}
+
+/*!
+    Return the text field used to display the receiver's title.
+
+    This is the Cappuccino equivalent to the `titleCell` method.
+*/
+- (CPTextField)titleView
+{
+    return _titleView;
+}
+
 - (void)_manageTitlePositioning
 {
     if (_titlePosition == CPNoTitle)
@@ -340,7 +380,7 @@ CPBelowBottom = 6;
         case CPAtTop:
         case CPAboveTop:
         case CPBelowTop:
-            [_titleView setFrameOrigin:CPPointMake(5.0, 0.0)];
+            [_titleView setFrameOrigin:CGPointMake(5.0, 0.0)];
             [_titleView setAutoresizingMask:CPViewNotSizable];
             break;
 
@@ -348,7 +388,7 @@ CPBelowBottom = 6;
         case CPAtBottom:
         case CPBelowBottom:
             var h = [_titleView frameSize].height;
-            [_titleView setFrameOrigin:CPPointMake(5.0, [self frameSize].height - h)];
+            [_titleView setFrameOrigin:CGPointMake(5.0, [self frameSize].height - h)];
             [_titleView setAutoresizingMask:CPViewMinYMargin];
             break;
     }
@@ -360,17 +400,13 @@ CPBelowBottom = 6;
 - (void)sizeToFit
 {
     var contentFrame = [_contentView frame],
-        offset = [self _titleHeightOffset];
+        offset = [self _titleHeightOffset],
+        contentMargin = [self valueForThemeAttribute:@"content-margin"];
 
     if (!contentFrame)
         return;
 
-    [_contentView setAutoresizingMask:CPViewNotSizable];
-    [self setFrameSize:CGSizeMake(contentFrame.size.width + _contentMargin.width * 2,
-                                  contentFrame.size.height + _contentMargin.height * 2 + offset[0])];
-    [_contentView setAutoresizingMask:CPViewWidthSizable | CPViewHeightSizable];
-
-    [_contentView setFrameOrigin:CGPointMake(_contentMargin.width, _contentMargin.height + offset[1])];
+    [_contentView setFrameOrigin:CGPointMake(contentMargin.width, contentMargin.height + offset[1])];
 }
 
 - (float)_titleHeightOffset
@@ -391,12 +427,17 @@ CPBelowBottom = 6;
     }
 }
 
-- (void)drawRect:(CPRect)rect
+- (void)setValue:(id)aValue forKey:(CPString)aKey
 {
-    if (_borderType === CPNoBorder)
-        return;
+    if (aKey === CPDisplayPatternTitleBinding)
+        [self setTitle:aValue || @""];
+    else
+        [super setValue:aValue forKey:aKey];
+}
 
-    var bounds = CGRectMakeCopy([self bounds]);
+- (void)drawRect:(CGRect)rect
+{
+    var bounds = [self bounds];
 
     switch (_boxType)
     {
@@ -404,9 +445,9 @@ CPBelowBottom = 6;
             // NSBox does not include a horizontal flag for the separator type. We have to determine
             // the type of separator to draw by the width and height of the frame.
             if (CGRectGetWidth(bounds) === 5.0)
-                return [self _drawVerticalSeperatorInRect:bounds];
+                return [self _drawVerticalSeparatorInRect:bounds];
             else if (CGRectGetHeight(bounds) === 5.0)
-                return [self _drawHorizontalSeperatorInRect:bounds];
+                return [self _drawHorizontalSeparatorInRect:bounds];
 
             break;
     }
@@ -421,81 +462,137 @@ CPBelowBottom = 6;
         bounds.size.height -= [_titleView frameSize].height;
     }
 
+    // Primary or secondary type boxes always draw the same way, unless they are CPNoBorder.
+    if ((_boxType === CPBoxPrimary || _boxType === CPBoxSecondary) && _borderType !== CPNoBorder)
+    {
+        [self _drawPrimaryBorderInRect:bounds];
+        return;
+    }
+
     switch (_borderType)
     {
         case CPBezelBorder:
             [self _drawBezelBorderInRect:bounds];
             break;
 
-        default:
+        case CPGrooveBorder:
         case CPLineBorder:
             [self _drawLineBorderInRect:bounds];
+            break;
+
+        case CPNoBorder:
+            [self _drawNoBorderInRect:bounds];
             break;
     }
 }
 
-- (void)_drawHorizontalSeperatorInRect:(CGRect)aRect
+- (void)_drawHorizontalSeparatorInRect:(CGRect)aRect
 {
     var context = [[CPGraphicsContext currentContext] graphicsPort];
 
     CGContextSetStrokeColor(context, [self borderColor]);
     CGContextSetLineWidth(context, 1.0);
 
-    CGContextMoveToPoint(context, CGRectGetMinX(aRect), CGRectGetMinY(aRect) + 0.5);
-    CGContextAddLineToPoint(context, CGRectGetWidth(aRect), CGRectGetMinY(aRect) + 0.5);
+    CGContextMoveToPoint(context, CGRectGetMinX(aRect), CGRectGetMidY(aRect));
+    CGContextAddLineToPoint(context, CGRectGetWidth(aRect), CGRectGetMidY(aRect));
     CGContextStrokePath(context);
 }
 
-- (void)_drawVerticalSeperatorInRect:(CGRect)aRect
+- (void)_drawVerticalSeparatorInRect:(CGRect)aRect
 {
     var context = [[CPGraphicsContext currentContext] graphicsPort];
 
     CGContextSetStrokeColor(context, [self borderColor]);
     CGContextSetLineWidth(context, 1.0);
 
-    CGContextMoveToPoint(context, CGRectGetMinX(aRect) + 0.5, CGRectGetMinY(aRect));
-    CGContextAddLineToPoint(context, CGRectGetMinX(aRect) + 0.5, CGRectGetHeight(aRect));
+    CGContextMoveToPoint(context, CGRectGetMidX(aRect), CGRectGetMinY(aRect));
+    CGContextAddLineToPoint(context, CGRectGetMidX(aRect), CGRectGetHeight(aRect));
     CGContextStrokePath(context);
+}
+
+- (void)_drawLineBorderInRect:(CGRect)aRect
+{
+    var context = [[CPGraphicsContext currentContext] graphicsPort],
+        cornerRadius = [self cornerRadius],
+        borderWidth = [self borderWidth];
+
+    aRect = CGRectInset(aRect, borderWidth / 2.0, borderWidth / 2.0);
+
+    CGContextSetFillColor(context, [self fillColor]);
+    CGContextSetStrokeColor(context, [self borderColor]);
+
+    CGContextSetLineWidth(context, borderWidth);
+    CGContextFillRoundedRectangleInRect(context, aRect, cornerRadius, YES, YES, YES, YES);
+    CGContextStrokeRoundedRectangleInRect(context, aRect, cornerRadius, YES, YES, YES, YES);
 }
 
 - (void)_drawBezelBorderInRect:(CGRect)aRect
 {
     var context = [[CPGraphicsContext currentContext] graphicsPort],
-        sides = [CPMinYEdge, CPMaxXEdge, CPMaxYEdge, CPMinXEdge],
-        sideGray = 190.0 / 255.0,
-        grays = [142.0 / 255.0, sideGray, sideGray, sideGray],
-        borderWidth = _borderWidth;
+        cornerRadius = [self cornerRadius],
+        borderWidth = [self borderWidth],
+        shadowOffset = [self valueForThemeAttribute:@"inner-shadow-offset"],
+        shadowSize = [self valueForThemeAttribute:@"inner-shadow-size"],
+        shadowColor = [self valueForThemeAttribute:@"inner-shadow-color"];
 
-    while (borderWidth--)
-        aRect = CPDrawTiledRects(aRect, aRect, sides, grays);
+    var baseRect = aRect;
+    aRect = CGRectInset(aRect, borderWidth / 2.0, borderWidth / 2.0);
 
+    CGContextSaveGState(context);
+
+    CGContextSetStrokeColor(context, [self borderColor]);
+    CGContextSetLineWidth(context, borderWidth);
     CGContextSetFillColor(context, [self fillColor]);
-    CGContextFillRect(context, aRect);
+    CGContextFillRoundedRectangleInRect(context, aRect, cornerRadius, YES, YES, YES, YES);
+    CGContextStrokeRoundedRectangleInRect(context, aRect, cornerRadius, YES, YES, YES, YES);
+
+    CGContextRestoreGState(context);
 }
 
-- (void)_drawLineBorderInRect:(CGRect)aRect
+- (void)_drawPrimaryBorderInRect:(CGRect)aRect
+{
+    // Draw the "primary" style CPBox.
+
+    var context = [[CPGraphicsContext currentContext] graphicsPort],
+        cornerRadius = [self cornerRadius],
+        borderWidth = [self borderWidth],
+        shadowOffset = [self valueForThemeAttribute:@"inner-shadow-offset"],
+        shadowSize = [self valueForThemeAttribute:@"inner-shadow-size"],
+        shadowColor = [self valueForThemeAttribute:@"inner-shadow-color"],
+        baseRect = aRect;
+
+    aRect = CGRectInset(aRect, borderWidth / 2.0, borderWidth / 2.0);
+
+    CGContextSaveGState(context);
+
+    CGContextSetStrokeColor(context, [self borderColor]);
+    CGContextSetLineWidth(context, borderWidth);
+    CGContextSetFillColor(context, [self fillColor]);
+    CGContextFillRoundedRectangleInRect(context, aRect, cornerRadius, YES, YES, YES, YES);
+
+    CGContextBeginPath(context);
+    // Note we can't use the 0.5 inset rectangle when setting up clipping. The clipping has to be
+    // on integer coordinates for this to look right in Chrome.
+    CGContextAddPath(context, CGPathWithRoundedRectangleInRect(baseRect, cornerRadius, cornerRadius, YES, YES, YES, YES));
+    CGContextClip(context);
+    CGContextSetShadowWithColor(context, shadowOffset, shadowSize, shadowColor);
+    CGContextStrokeRoundedRectangleInRect(context, aRect, cornerRadius, YES, YES, YES, YES);
+
+    CGContextRestoreGState(context);
+}
+
+- (void)_drawNoBorderInRect:(CGRect)aRect
 {
     var context = [[CPGraphicsContext currentContext] graphicsPort];
 
-    aRect = CGRectInset(aRect, _borderWidth / 2.0, _borderWidth / 2.0);
-
     CGContextSetFillColor(context, [self fillColor]);
-    CGContextSetStrokeColor(context, [self borderColor]);
-
-    CGContextSetLineWidth(context, _borderWidth);
-    CGContextFillRoundedRectangleInRect(context, aRect, _cornerRadius, YES, YES, YES, YES);
-    CGContextStrokeRoundedRectangleInRect(context, aRect, _cornerRadius, YES, YES, YES, YES);
+    CGContextFillRect(context, aRect);
 }
 
 @end
 
 var CPBoxTypeKey          = @"CPBoxTypeKey",
     CPBoxBorderTypeKey    = @"CPBoxBorderTypeKey",
-    CPBoxBorderColorKey   = @"CPBoxBorderColorKey",
-    CPBoxFillColorKey     = @"CPBoxFillColorKey",
-    CPBoxCornerRadiusKey  = @"CPBoxCornerRadiusKey",
-    CPBoxBorderWidthKey   = @"CPBoxBorderWidthKey",
-    CPBoxContentMarginKey = @"CPBoxContentMarginKey",
     CPBoxTitle            = @"CPBoxTitle",
     CPBoxTitlePosition    = @"CPBoxTitlePosition",
     CPBoxTitleView        = @"CPBoxTitleView";
@@ -510,14 +607,6 @@ var CPBoxTypeKey          = @"CPBoxTypeKey",
     {
         _boxType       = [aCoder decodeIntForKey:CPBoxTypeKey];
         _borderType    = [aCoder decodeIntForKey:CPBoxBorderTypeKey];
-
-        _borderColor   = [aCoder decodeObjectForKey:CPBoxBorderColorKey];
-        _fillColor     = [aCoder decodeObjectForKey:CPBoxFillColorKey];
-
-        _cornerRadius  = [aCoder decodeFloatForKey:CPBoxCornerRadiusKey];
-        _borderWidth   = [aCoder decodeFloatForKey:CPBoxBorderWidthKey];
-
-        _contentMargin = [aCoder decodeSizeForKey:CPBoxContentMarginKey];
 
         _title         = [aCoder decodeObjectForKey:CPBoxTitle];
         _titlePosition = [aCoder decodeIntForKey:CPBoxTitlePosition];
@@ -540,18 +629,9 @@ var CPBoxTypeKey          = @"CPBoxTypeKey",
 
     [aCoder encodeInt:_boxType forKey:CPBoxTypeKey];
     [aCoder encodeInt:_borderType forKey:CPBoxBorderTypeKey];
-
-    [aCoder encodeObject:_borderColor forKey:CPBoxBorderColorKey];
-    [aCoder encodeObject:_fillColor forKey:CPBoxFillColorKey];
-
-    [aCoder encodeFloat:_cornerRadius forKey:CPBoxCornerRadiusKey];
-    [aCoder encodeFloat:_borderWidth forKey:CPBoxBorderWidthKey];
-
     [aCoder encodeObject:_title forKey:CPBoxTitle];
     [aCoder encodeInt:_titlePosition forKey:CPBoxTitlePosition];
     [aCoder encodeObject:_titleView forKey:CPBoxTitleView];
-
-    [aCoder encodeSize:_contentMargin forKey:CPBoxContentMarginKey];
 }
 
 @end

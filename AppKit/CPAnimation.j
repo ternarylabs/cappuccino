@@ -123,23 +123,29 @@ ACTUAL_FRAME_RATE = 0;
 - (void)setAnimationCurve:(CPAnimationCurve)anAnimationCurve
 {
     var timingFunctionName;
+
     switch (anAnimationCurve)
     {
-        case CPAnimationEaseInOut:  timingFunctionName = kCAMediaTimingFunctionEaseInEaseOut;
-                                    break;
+        case CPAnimationEaseInOut:
+            timingFunctionName = kCAMediaTimingFunctionEaseInEaseOut;
+            break;
 
-        case CPAnimationEaseIn:     timingFunctionName = kCAMediaTimingFunctionEaseIn;
-                                    break;
+        case CPAnimationEaseIn:
+            timingFunctionName = kCAMediaTimingFunctionEaseIn;
+            break;
 
-        case CPAnimationEaseOut:    timingFunctionName = kCAMediaTimingFunctionEaseOut;
-                                    break;
+        case CPAnimationEaseOut:
+            timingFunctionName = kCAMediaTimingFunctionEaseOut;
+            break;
 
-        case CPAnimationLinear:     timingFunctionName = kCAMediaTimingFunctionLinear;
-                                    break;
+        case CPAnimationLinear:
+            timingFunctionName = kCAMediaTimingFunctionLinear;
+            break;
 
-        default:                    [CPException raise:CPInvalidArgumentException
-                                                reason:"Invalid value provided for animation curve"];
-                                    break;
+        default:
+            [CPException raise:CPInvalidArgumentException
+                        reason:@"Invalid value provided for animation curve"];
+            break;
     }
 
     _animationCurve = anAnimationCurve;
@@ -230,7 +236,9 @@ ACTUAL_FRAME_RATE = 0;
     ACTUAL_FRAME_RATE = 0;
     _lastTime = new Date();
 
-    _timer = [CPTimer scheduledTimerWithTimeInterval:0.0 target:self selector:@selector(animationTimerDidFire:) userInfo:nil repeats:YES];
+    var timerInterval = _frameRate <= 0.0 ? 0.0001 : 1.0/_frameRate;
+
+    _timer = [CPTimer scheduledTimerWithTimeInterval:timerInterval target:self selector:@selector(animationTimerDidFire:) userInfo:nil repeats:YES];
 }
 
 /*
@@ -307,7 +315,7 @@ ACTUAL_FRAME_RATE = 0;
 
     if ([_delegate respondsToSelector:@selector(animation:valueForProgress:)])
         return [_delegate animation:self valueForProgress:t];
-    
+
     if (_animationCurve == CPAnimationLinear)
         return t;
 
@@ -325,7 +333,7 @@ ACTUAL_FRAME_RATE = 0;
 // currently used function to determine time
 // 1:1 conversion to js from webkit source files
 // UnitBezier.h, WebCore_animation_AnimationBase.cpp
-var CubicBezierAtTime = function CubicBezierAtTime(t, p1x, p1y, p2x, p2y, duration)
+var CubicBezierAtTime = function(t, p1x, p1y, p2x, p2y, duration)
 {
     var ax = 0,
         bx = 0,

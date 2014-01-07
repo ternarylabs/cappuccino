@@ -13,12 +13,13 @@ CPLogRegister(CPLogConsole);
 @implementation AppController : CPObject
 {
     CPWindow    theWindow; //this "outlet" is connected automatically by the Cib
+    CPImage     iconImage;
 }
 
 - (void)applicationDidFinishLaunching:(CPNotification)aNotification
 {
     // This is called when the application is done loading.
-    iconImage = [[CPImage alloc] initWithContentsOfFile:"http://cappuccino.org/images/favicon.png" size:CGSizeMake(16,16)];
+    iconImage = [[CPImage alloc] initWithContentsOfFile:"http://cappuccino-project.org/img/favicon.ico" size:CGSizeMake(16,16)];
 }
 
 - (void)awakeFromCib
@@ -28,7 +29,7 @@ CPLogRegister(CPLogConsole);
     // It's a useful hook for setting up current UI values, and other things.
 
     // In this case, we want the window from Cib to become our full browser window
-    [theWindow setFullBridge:YES];
+    [theWindow setFullPlatformWindow:YES];
 }
 
 - (int)numberOfRowsInTableView:(CPTableView)tableView
@@ -36,12 +37,20 @@ CPLogRegister(CPLogConsole);
     return 100000;
 }
 
-- (id)tableView:(CPTableView)tableView objectValueForTableColumn:(CPTableColumn)tableColumn row:(int)row
+- (id)tableView:(CPTableView)tableView objectValueForTableColumn:(CPTableColumn)tableColumn row:(CPInteger)row
 {
     if ([tableColumn identifier] === "icons")
         return iconImage;
     else
         return String((row + 1) * [[tableColumn identifier] intValue]);
+}
+
+- (BOOL)tableView:(CPTableView)tableView shouldReorderColumn:(CPInteger)columnIndex toColumn:(CPInteger)newColumnIndex
+{
+    if (columnIndex === 0 || newColumnIndex === 4)
+        return NO;
+    else
+        return YES;
 }
 
 @end

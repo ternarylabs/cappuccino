@@ -21,7 +21,11 @@
  */
 
 @import <Foundation/CPObject.j>
+@import <Foundation/CPObjJRuntime.j>
 
+@import "CPEvent.j"
+
+@class CPKeyBinding
 
 CPDeleteKeyCode         = 8;
 CPTabKeyCode            = 9;
@@ -352,7 +356,7 @@ CPDeleteForwardKeyCode  = 46;
 var CPResponderNextResponderKey = @"CPResponderNextResponderKey",
     CPResponderMenuKey = @"CPResponderMenuKey";
 
-@implementation CPResponder (CPCoding)
+@implementation CPResponder (CPCoding) <CPCoding>
 
 /*!
     Initializes the responder with data from a coder.

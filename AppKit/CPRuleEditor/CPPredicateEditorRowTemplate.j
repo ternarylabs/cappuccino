@@ -20,6 +20,17 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
+@import <Foundation/CPPredicate.j>
+
+@import "CPCheckBox.j"
+@import "CPPopUpButton.j"
+@import "CPMenuItem.j"
+@import "CPTextField.j"
+
+// NOTE: CPDatePicker is not implemented yet
+@class CPDatePicker
+
+
 CPUndefinedAttributeType     = 0;
 CPInteger16AttributeType     = 100;
 CPInteger32AttributeType     = 200;
@@ -185,7 +196,8 @@ CPTransformableAttributeType = 1800;
         if (![[self operators] containsObject:[predicate predicateOperatorType]])
             return 0;
 
-        if (!_rightIsWildcard && ![[self rightExpressions] containsObject:[predicate rightExpression]]) return 0;
+        if (!_rightIsWildcard && ![[self rightExpressions] containsObject:[predicate rightExpression]])
+            return 0;
 
         return 1;
     }
@@ -280,7 +292,7 @@ CPTransformableAttributeType = 1800;
 */
 - (CPArray)leftExpressions
 {
-    if (_templateType ==1 && !_leftIsWildcard)
+    if (_templateType == 1 && !_leftIsWildcard)
     {
         var view = [_views objectAtIndex:0];
         return [[view itemArray] valueForKey:@"representedObject"];
@@ -582,7 +594,7 @@ CPTransformableAttributeType = 1800;
 
 - (CPPopUpButton)_viewFromExpressions:(CPArray)expressions
 {
-    var popup = [[CPPopUpButton alloc] initWithFrame:CPMakeRect(0, 0, 100, 18)],
+    var popup = [[CPPopUpButton alloc] initWithFrame:CGRectMake(0, 0, 100, 18)],
         count = [expressions count];
 
     for (var i = 0; i < count; i++)
@@ -685,16 +697,17 @@ CPTransformableAttributeType = 1800;
     [textField setBordered:YES];
     [textField setEditable:YES];
     [textField setFont:[CPFont systemFontOfSize:10]];
+    [textField setSendsActionOnEndEditing:YES];
 
     return textField;
 }
 
-- (void)_setOptions:(unsigned int)options
+- (void)_setOptions:(unsigned)options
 {
     _predicateOptions = options;
 }
 
-- (void)_setModifier:(unsigned int)modifier
+- (void)_setModifier:(unsigned)modifier
 {
     _predicateModifier = modifier;
 }

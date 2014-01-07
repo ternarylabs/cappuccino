@@ -292,7 +292,7 @@
 
     loc += (""+f).length;
     var i = 0;
-    while (!isNaN(parseFloat(str.substring(loc+i, str.length))))
+    while (!isNaN(parseFloat(str.substring(loc + i, str.length))))
         {i++;}
 
     [self setScanLocation:loc + i];
@@ -329,7 +329,7 @@
 /* = Debug = */
 /* ========= */
 
-- (void)description
+- (CPString)description
 {
     return [super description] + " {" + CPStringFromClass([self class]) + ", state = '" + ([self string].substr(0, _scanLocation) + "{{ SCAN LOCATION ->}}" + [self string].substr(_scanLocation)) + "'; }";
 }

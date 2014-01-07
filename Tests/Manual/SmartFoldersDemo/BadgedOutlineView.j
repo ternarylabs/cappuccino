@@ -171,7 +171,7 @@ var CPSourceListDataSource_sourceList_itemHasBadge_                   = 1 << 1,
 
 /* This CPOutlineView subclass is necessary only if you want to delete items by dragging them to the trash.  In order to support drags to the trash, you need to implement draggedImage:endedAt:operation: and handle the CPDragOperationDelete operation.  For any other operation, pass the message to the superclass
 */
-- (void)draggedImage:(CPImage)image endedAt:(CPPoint)screenPoint operation:(CPDragOperation)operation
+- (void)draggedImage:(CPImage)image endedAt:(CGPoint)screenPoint operation:(CPDragOperation)operation
 {
     if (operation == CPDragOperationDelete)
     {
@@ -198,7 +198,7 @@ var CPSourceListDataSource_sourceList_itemHasBadge_                   = 1 << 1,
 
 @implementation CPOutlineView (MyExtensions)
 
-- (CPView)preparedViewAtColumn:(int)column row:(int)row
+- (CPView)preparedViewAtColumn:(CPInteger)column row:(CPInteger)row
 {
     return [self _newDataViewForRow:row tableColumn:_tableColumns[column]];
 }

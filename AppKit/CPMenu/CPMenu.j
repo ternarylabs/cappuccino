@@ -25,12 +25,10 @@
 @import <Foundation/CPNotificationCenter.j>
 @import <Foundation/CPString.j>
 
-@import "_CPMenuManager.j"
-@import "CPApplication.j"
-@import "CPClipView.j"
+@import "CPKeyValueBinding.j"
 @import "CPMenuItem.j"
-@import "CPPanel.j"
 
+@global CPApp
 
 CPMenuDidAddItemNotification        = @"CPMenuDidAddItemNotification";
 CPMenuDidChangeItemNotification     = @"CPMenuDidChangeItemNotification";
@@ -38,12 +36,8 @@ CPMenuDidRemoveItemNotification     = @"CPMenuDidRemoveItemNotification";
 
 CPMenuDidEndTrackingNotification    = @"CPMenuDidEndTrackingNotification";
 
-var MENUBAR_HEIGHT = 28.0;
-
 var _CPMenuBarVisible               = NO,
     _CPMenuBarTitle                 = @"",
-    _CPMenuBarIconImage             = nil,
-    _CPMenuBarIconImageAlphaValue   = 1.0,
     _CPMenuBarAttributes            = nil,
     _CPMenuBarSharedWindow          = nil;
 
@@ -74,16 +68,18 @@ var _CPMenuBarVisible               = NO,
 
     int             _highlightedIndex;
     _CPMenuWindow   _menuWindow;
+
+    CPEvent         _lastCloseEvent;
 }
 
 // Managing the Menu Bar
 
 + (void)initialize
 {
-    if (self !== CPMenu)
+    if (self !== [CPMenu class])
         return;
 
-    [[self class] setMenuBarAttributes:[CPDictionary dictionary]];
+    [[self class] setMenuBarAttributes:@{}];
 }
 
 + (BOOL)menuBarVisible
@@ -109,8 +105,8 @@ var _CPMenuBarVisible               = NO,
         [_CPMenuBarSharedWindow setMenu:[CPApp mainMenu]];
 
         [_CPMenuBarSharedWindow setTitle:_CPMenuBarTitle];
-        [_CPMenuBarSharedWindow setIconImage:_CPMenuBarIconImage];
-        [_CPMenuBarSharedWindow setIconImageAlphaValue:_CPMenuBarIconImageAlphaValue];
+        [_CPMenuBarSharedWindow setIconImage:[[CPTheme defaultTheme] valueForAttributeWithName:@"menu-bar-icon-image" forClass:_CPMenuView]];
+        [_CPMenuBarSharedWindow setIconImageAlphaValue:[[CPTheme defaultTheme] valueForAttributeWithName:@"menu-bar-icon-image-alpha-value" forClass:_CPMenuView]];
 
         [_CPMenuBarSharedWindow setColor:[_CPMenuBarAttributes objectForKey:@"CPMenuBarBackgroundColor"]];
         [_CPMenuBarSharedWindow setTextColor:[_CPMenuBarAttributes objectForKey:@"CPMenuBarTextColor"]];
@@ -154,6 +150,13 @@ var _CPMenuBarVisible               = NO,
     return _CPMenuBarImage;
 }
 
++ (void)_setOrRemoveMenuBarAttribute:(id)aValue forKey:(id)aKey
+{
+    if (aValue === nil)
+        [_CPMenuBarAttributes removeObjectForKey:aKey];
+    else
+        [_CPMenuBarAttributes setObject:aValue forKey:aKey];
+}
 
 + (void)setMenuBarAttributes:(CPDictionary)attributes
 {
@@ -178,8 +181,8 @@ var _CPMenuBarVisible               = NO,
 
     else if (!textColor && !titleColor)
     {
-        [_CPMenuBarAttributes setObject:[CPColor colorWithRed:0.051 green:0.2 blue:0.275 alpha:1.0] forKey:@"CPMenuBarTextColor"];
-        [_CPMenuBarAttributes setObject:[CPColor colorWithRed:0.051 green:0.2 blue:0.275 alpha:1.0] forKey:@"CPMenuBarTitleColor"];
+        [self _setOrRemoveMenuBarAttribute:[[CPTheme defaultTheme] valueForAttributeWithName:@"menu-bar-text-color" forClass:_CPMenuView] forKey:@"CPMenuBarTextColor"];
+        [self _setOrRemoveMenuBarAttribute:[[CPTheme defaultTheme] valueForAttributeWithName:@"menu-bar-title-color" forClass:_CPMenuView] forKey:@"CPMenuBarTitleColor"];
     }
 
     if (!textShadowColor && titleShadowColor)
@@ -190,18 +193,18 @@ var _CPMenuBarVisible               = NO,
 
     else if (!textShadowColor && !titleShadowColor)
     {
-        [_CPMenuBarAttributes setObject:[CPColor whiteColor] forKey:@"CPMenuBarTextShadowColor"];
-        [_CPMenuBarAttributes setObject:[CPColor whiteColor] forKey:@"CPMenuBarTitleShadowColor"];
+        [self _setOrRemoveMenuBarAttribute:[[CPTheme defaultTheme] valueForAttributeWithName:@"menu-bar-text-shadow-color" forClass:_CPMenuView] forKey:@"CPMenuBarTextShadowColor"];
+        [self _setOrRemoveMenuBarAttribute:[[CPTheme defaultTheme] valueForAttributeWithName:@"menu-bar-title-shadow-color" forClass:_CPMenuView] forKey:@"CPMenuBarTitleShadowColor"];
     }
 
     if (!highlightColor)
-        [_CPMenuBarAttributes setObject:[CPColor colorWithCalibratedRed:94.0 / 255.0 green:130.0 / 255.0 blue:186.0 / 255.0 alpha:1.0] forKey:@"CPMenuBarHighlightColor"];
+        [self _setOrRemoveMenuBarAttribute:[[CPTheme defaultTheme] valueForAttributeWithName:@"menu-bar-highlight-color" forClass:_CPMenuView] forKey:@"CPMenuBarHighlightColor"];
 
     if (!highlightTextColor)
-        [_CPMenuBarAttributes setObject:[CPColor whiteColor] forKey:@"CPMenuBarHighlightTextColor"];
+        [self _setOrRemoveMenuBarAttribute:[[CPTheme defaultTheme] valueForAttributeWithName:@"menu-bar-highlight-text-color" forClass:_CPMenuView] forKey:@"CPMenuBarHighlightTextColor"];
 
     if (!highlightTextShadowColor)
-        [_CPMenuBarAttributes setObject:[CPColor blackColor] forKey:@"CPMenuBarHighlightTextShadowColor"];
+        [self _setOrRemoveMenuBarAttribute:[[CPTheme defaultTheme] valueForAttributeWithName:@"menu-bar-highlight-text-shadow-color" forClass:_CPMenuView] forKey:@"CPMenuBarHighlightTextShadowColor"];
 
     if (_CPMenuBarSharedWindow)
     {
@@ -230,14 +233,14 @@ var _CPMenuBarVisible               = NO,
 - (float)menuBarHeight
 {
     if (self === [CPApp mainMenu])
-        return MENUBAR_HEIGHT;
+        return [CPMenu menuBarHeight];
 
     return 0.0;
 }
 
 + (float)menuBarHeight
 {
-    return MENUBAR_HEIGHT;
+    return [[CPTheme defaultTheme] valueForAttributeWithName:@"menu-bar-height" forClass:_CPMenuView];
 }
 
 // Creating a CPMenu Object
@@ -275,7 +278,7 @@ var _CPMenuBarVisible               = NO,
     @param aMenuItem the item to insert
     @param anIndex the index in the menu to insert the item.
 */
-- (void)insertItem:(CPMenuItem)aMenuItem atIndex:(unsigned)anIndex
+- (void)insertItem:(CPMenuItem)aMenuItem atIndex:(CPUInteger)anIndex
 {
     [self insertObject:aMenuItem inItemsAtIndex:anIndex];
 }
@@ -288,7 +291,7 @@ var _CPMenuBarVisible               = NO,
     @param anIndex the index location in the menu for the new item
     @return the new menu item
 */
-- (CPMenuItem)insertItemWithTitle:(CPString)aTitle action:(SEL)anAction keyEquivalent:(CPString)aKeyEquivalent atIndex:(unsigned)anIndex
+- (CPMenuItem)insertItemWithTitle:(CPString)aTitle action:(SEL)anAction keyEquivalent:(CPString)aKeyEquivalent atIndex:(CPUInteger)anIndex
 {
     var item = [[CPMenuItem alloc] initWithTitle:aTitle action:anAction keyEquivalent:aKeyEquivalent];
 
@@ -332,7 +335,7 @@ var _CPMenuBarVisible               = NO,
     Removes the item at the specified index from the menu
     @param anIndex the index of the item to remove
 */
-- (void)removeItemAtIndex:(unsigned)anIndex
+- (void)removeItemAtIndex:(CPUInteger)anIndex
 {
     [self removeObjectFromItemsAtIndex:anIndex];
 }
@@ -352,7 +355,7 @@ var _CPMenuBarVisible               = NO,
     while (count--)
         [_items[count] setMenu:nil];
 
-    _highlightedIndex = CPNotFound;
+    [self _highlightItemAtIndex:CPNotFound];
 
     // Because we are changing _items directly, be sure to notify KVO
     [self willChangeValueForKey:@"items"];
@@ -366,7 +369,12 @@ var _CPMenuBarVisible               = NO,
 */
 - (void)itemChanged:(CPMenuItem)aMenuItem
 {
-    if ([aMenuItem menu] !== self)
+    /*
+        During cib unarchiving, menu items will have a reference to their menu,
+        but of course the items are still being unarchived and the menu's _items
+        have not yet been instantiated. In that case we will not do anything here.
+    */
+    if ([aMenuItem menu] !== self || !_items)
         return;
 
     [aMenuItem setValue:[aMenuItem valueForKey:@"changeCount"] + 1 forKey:@"changeCount"];
@@ -374,7 +382,7 @@ var _CPMenuBarVisible               = NO,
     [[CPNotificationCenter defaultCenter]
         postNotificationName:CPMenuDidChangeItemNotification
                       object:self
-                    userInfo:[CPDictionary dictionaryWithObject:[_items indexOfObjectIdenticalTo:aMenuItem] forKey:@"CPMenuItemIndex"]];
+                    userInfo:@{ @"CPMenuItemIndex": [_items indexOfObjectIdenticalTo:aMenuItem] }];
 }
 
 // Finding Menu Items
@@ -607,15 +615,17 @@ var _CPMenuBarVisible               = NO,
 
 /*!
     Enables or disables the receiver’s menu items.
-    If the target does not implement the menu item's action method the item is disabled.
-    If the target responsds to selector validateMenuItem: or validateUserInterfaceItem: (in that order) the return value is used.
+    If the item has no target, an action binding is checked. If the target does not implement
+    the menu item's action method or the binding's selector, the item is disabled.
+    If the target responds to selector validateMenuItem: or validateUserInterfaceItem: (in that order) the return value is used.
 */
 - (void)update
 {
-    if (![self autoenablesItems])
+    if (!_autoenablesItems)
         return;
 
     var items = [self itemArray];
+
     for (var i = 0; i < [items count]; i++)
     {
         var item = [items objectAtIndex:i];
@@ -623,14 +633,50 @@ var _CPMenuBarVisible               = NO,
         if ([item hasSubmenu])
             continue;
 
-        var validator = [CPApp targetForAction:[item action] to:[item target] from:item];
+        // If there are enabled bindings for the item, they override anything else
+        var binder = [CPBinder getBinding:CPEnabledBinding forObject:item];
 
-        if (!validator || ![validator respondsToSelector:[item action]])
-            [item setEnabled:NO];
+        if (binder)
+        {
+            [binder setValueFor:CPEnabledBinding];
+            return;
+        }
+
+        var validator = [CPApp targetForAction:[item action] to:[item target] from:item],
+            shouldBeEnabled = YES;
+
+        if (!validator)
+        {
+            // If targetForAction: returns nil, it could be that there is no action.
+            // If there is an action and nil is returned, no valid target could be found.
+            if ([item action] || [item target])
+                shouldBeEnabled = NO;
+            else
+            {
+                // Check to see if there is a target binding with an invalid selector
+                var info = [CPBinder infoForBinding:CPTargetBinding forObject:item];
+
+                if (info)
+                {
+                    var object = [info objectForKey:CPObservedObjectKey],
+                        keyPath = [info objectForKey:CPObservedKeyPathKey],
+                        options = [info objectForKey:CPOptionsKey],
+                        target = [object valueForKeyPath:keyPath],
+                        selector = [options valueForKey:CPSelectorNameBindingOption];
+
+                    if (target && selector && ![target respondsToSelector:CPSelectorFromString(selector)])
+                        shouldBeEnabled = NO;
+                }
+            }
+        }
+        else if (![validator respondsToSelector:[item action]])
+            shouldBeEnabled = NO;
         else if ([validator respondsToSelector:@selector(validateMenuItem:)])
-            [item setEnabled:[validator validateMenuItem:item]];
+            shouldBeEnabled = [validator validateMenuItem:item];
         else if ([validator respondsToSelector:@selector(validateUserInterfaceItem:)])
-            [item setEnabled:[validator validateUserInterfaceItem:item]];
+            shouldBeEnabled = [validator validateUserInterfaceItem:item];
+
+        [item setEnabled:shouldBeEnabled];
     }
 
     [[_menuWindow _menuView] tile];
@@ -675,7 +721,13 @@ var _CPMenuBarVisible               = NO,
     // highlightedItem is always enabled. Do there exist edge cases: disabling on closing a menu,
     // etc.? Requires further investigation and tests.
     if (highlightedItem && [highlightedItem isEnabled])
+    {
+        // Perform any action binding
+        var binding = [CPBinder getBinding:CPTargetBinding forObject:highlightedItem];
+        [binding invokeAction];
+
         [CPApp sendAction:[highlightedItem action] to:[highlightedItem target] from:highlightedItem];
+    }
 }
 
 //
@@ -803,10 +855,13 @@ var _CPMenuBarVisible               = NO,
 
 + (void)popUpContextMenu:(CPMenu)aMenu withEvent:(CPEvent)anEvent forView:(CPView)aView withFont:(CPFont)aFont
 {
+    // This is needed when we are making several rights click
+    [[_CPMenuManager sharedMenuManager] cancelActiveMenu];
+
     [aMenu _menuWillOpen];
 
     if (!aFont)
-        aFont = [CPFont systemFontOfSize:12.0];
+        aFont = [CPFont systemFontOfSize:[CPFont systemFontSize]];
 
     var theWindow = [aView window],
         menuWindow = [_CPMenuWindow menuWindowWithMenu:aMenu font:aFont];
@@ -906,6 +961,10 @@ var _CPMenuBarVisible               = NO,
 
 - (void)_menuDidClose
 {
+    // Remember which event caused this menu to close, if any. CPPopUpButton uses this to detect
+    // when a click on the button itself caused the menu to close.
+    _lastCloseEvent = [CPApp currentEvent];
+
     var delegate = [self delegate];
 
     if ([delegate respondsToSelector:@selector(menuDidClose:)])
@@ -925,7 +984,7 @@ var _CPMenuBarVisible               = NO,
 {
     [CPApp sendEvent:[CPEvent
         otherEventWithType:CPAppKitDefined
-                  location:_CGPointMakeZero()
+                  location:CGPointMakeZero()
              modifierFlags:0
                  timestamp:0
               windowNumber:0
@@ -976,8 +1035,7 @@ var _CPMenuBarVisible               = NO,
 
     for (; index < count; ++index)
     {
-        var item = _items[index],
-            modifierMask = [item keyEquivalentModifierMask];
+        var item = _items[index];
 
         if ([anEvent _triggersKeyEquivalent:[item keyEquivalent] withModifierMask:[item keyEquivalentModifierMask]])
         {
@@ -1003,7 +1061,7 @@ var _CPMenuBarVisible               = NO,
     Sends the action of the menu item at the specified index.
     @param anIndex the index of the item
 */
-- (void)performActionForItemAtIndex:(unsigned)anIndex
+- (void)performActionForItemAtIndex:(CPUInteger)anIndex
 {
     var item = _items[anIndex];
 
@@ -1106,12 +1164,13 @@ var _CPMenuBarVisible               = NO,
             return;
 
     [aMenuItem setMenu:self];
+    [self _highlightItemAtIndex:CPNotFound];
     [_items insertObject:aMenuItem atIndex:anIndex];
 
     [[CPNotificationCenter defaultCenter]
         postNotificationName:CPMenuDidAddItemNotification
                       object:self
-                    userInfo:[CPDictionary dictionaryWithObject:anIndex forKey:@"CPMenuItemIndex"]];
+                    userInfo:@{ @"CPMenuItemIndex": anIndex }];
 }
 
 - (void)removeObjectFromItemsAtIndex:(CPUInteger)anIndex
@@ -1120,12 +1179,13 @@ var _CPMenuBarVisible               = NO,
         return;
 
     [[_items objectAtIndex:anIndex] setMenu:nil];
+    [self _highlightItemAtIndex:CPNotFound];
     [_items removeObjectAtIndex:anIndex];
 
     [[CPNotificationCenter defaultCenter]
         postNotificationName:CPMenuDidRemoveItemNotification
                       object:self
-                    userInfo:[CPDictionary dictionaryWithObject:anIndex forKey:@"CPMenuItemIndex"]];
+                    userInfo:@{ @"CPMenuItemIndex": anIndex }];
 }
 
 @end
@@ -1133,7 +1193,8 @@ var _CPMenuBarVisible               = NO,
 var CPMenuTitleKey              = @"CPMenuTitleKey",
     CPMenuNameKey               = @"CPMenuNameKey",
     CPMenuItemsKey              = @"CPMenuItemsKey",
-    CPMenuShowsStateColumnKey   = @"CPMenuShowsStateColumnKey";
+    CPMenuShowsStateColumnKey   = @"CPMenuShowsStateColumnKey",
+    CPMenuAutoEnablesItemsKey   = @"CPMenuAutoEnablesItemsKey";
 
 @implementation CPMenu (CPCoding)
 
@@ -1155,7 +1216,7 @@ var CPMenuTitleKey              = @"CPMenuTitleKey",
 
         _showsStateColumn = ![aCoder containsValueForKey:CPMenuShowsStateColumnKey] || [aCoder decodeBoolForKey:CPMenuShowsStateColumnKey];
 
-        _autoenablesItems = YES;
+        _autoenablesItems = ![aCoder containsValueForKey:CPMenuAutoEnablesItemsKey] || [aCoder decodeBoolForKey:CPMenuAutoEnablesItemsKey];
 
         [self setMinimumWidth:0];
     }
@@ -1178,6 +1239,9 @@ var CPMenuTitleKey              = @"CPMenuTitleKey",
 
     if (!_showsStateColumn)
         [aCoder encodeBool:_showsStateColumn forKey:CPMenuShowsStateColumnKey];
+
+    if (!_autoenablesItems)
+        [aCoder encodeBool:_autoenablesItems forKey:CPMenuAutoEnablesItemsKey];
 }
 
 @end

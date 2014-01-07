@@ -1,9 +1,25 @@
 /*
- *     Created by cacaodev@gmail.com.
- *     Copyright (c) 2011 Pear, Inc. All rights reserved.
+ * Created by cacaodev@gmail.com.
+ * Copyright (c) 2011 Pear, Inc. All rights reserved.
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
-@class _CPPredicateEditorTree;
+@import <Foundation/CPObject.j>
+@import <Foundation/CPString.j>
+
 @implementation _CPPredicateEditorRowNode : CPObject
 {
     _CPPredicateEditorTree                   tree @accessors;
@@ -14,24 +30,21 @@
 
 + (id)rowNodeFromTree:(id)aTree
 {
-    var mapTable = {};
-    return [_CPPredicateEditorRowNode _rowNodeFromTree:aTree withTemplateTable:mapTable];
+    return [_CPPredicateEditorRowNode _rowNodeFromTree:aTree withTemplateTable:{}];
 }
 
 + (id)_rowNodeFromTree:(id)aTree withTemplateTable:(id)templateTable
 {
-    var node,
-        views,
+    var views,
         copiedContainer;
 
-    node = [[_CPPredicateEditorRowNode alloc] init];
-    node.tree = aTree;
+    var uuid = [[aTree template] UID],
+        cachedNode = templateTable[uuid],
+        node = [[_CPPredicateEditorRowNode alloc] init];
 
-    var template = [aTree template],
-        uuid = [template UID],
-        cachedNode = templateTable[uuid];
+    [node setTree:aTree];
 
-    if (cachedNode === nil)
+    if (!cachedNode)
     {
         views = [CPMutableArray array];
         copiedContainer = [CPMutableArray array];
@@ -43,8 +56,8 @@
         copiedContainer = [cachedNode copiedTemplateContainer];
     }
 
-    node.templateViews = views;
-    node.copiedTemplateContainer = copiedContainer;
+    [node setTemplateViews:views];
+    [node setCopiedTemplateContainer:copiedContainer];
 
     var nodeChildren = [CPMutableArray array],
         treeChildren = [aTree children],
@@ -65,7 +78,8 @@
 
 - (BOOL)applyTemplate:(id)template withViews:(id)views forOriginalTemplate:(id)originalTemplate
 {
-    var t = [tree template];
+    var t = [tree template],
+        count = [children count];
 
     if (t !== template)
     {
@@ -74,9 +88,7 @@
         [copiedTemplateContainer addObject:template];
     }
 
-    var count = [children count];
-
-    for (var i; i < count; i++)
+    for (var i = 0; i < count; i++)
         [children[i] applyTemplate:template withViews:views forOriginalTemplate:originalTemplate];
 }
 
@@ -92,7 +104,6 @@
 {
     if ([copiedTemplateContainer count] === 0)
     {
-        CPLogConsole("COPYING TEMPLATE");
         var copy = [[tree template] copy];
         [copiedTemplateContainer addObject:copy];
         [templateViews addObjectsFromArray:[copy templateViews]];

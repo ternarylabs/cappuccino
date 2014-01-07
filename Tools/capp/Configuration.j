@@ -2,6 +2,8 @@
 @import <Foundation/CPDictionary.j>
 @import <Foundation/CPString.j>
 @import <Foundation/CPObject.j>
+@import <Foundation/CPSet.j>
+
 
 var FILE = require("file"),
     SYSTEM = require("system");
@@ -22,7 +24,7 @@ var DefaultDictionary       = nil,
     if (self !== [Configuration class])
         return;
 
-    DefaultDictionary = [CPDictionary dictionary];
+    DefaultDictionary = @{};
 
     [DefaultDictionary setObject:@"You" forKey:@"user.name"];
     [DefaultDictionary setObject:@"you@yourcompany.com" forKey:@"user.email"];
@@ -61,14 +63,14 @@ var DefaultDictionary       = nil,
     if (self)
     {
         path = aPath;
-        temporaryDictionary = [CPDictionary dictionary];
+        temporaryDictionary = @{};
 
         if (path && FILE.isReadable(path))
             dictionary = CFPropertyList.readPropertyListFromFile(path);
 
         // readPlist will return nil if the file is empty
         if (!dictionary)
-            dictionary = [CPDictionary dictionary];
+            dictionary = @{};
     }
 
     return self;
@@ -124,12 +126,12 @@ var DefaultDictionary       = nil,
 
 - (void)save
 {
-    var path = [self path];
+    var aPath = [self path];
 
-    if (!path)
+    if (!aPath)
         return;
 
-    CFPropertyList.writePropertyListToFile(dictionary, path);
+    CFPropertyList.writePropertyListToFile(dictionary, aPath);
 }
 
 @end
